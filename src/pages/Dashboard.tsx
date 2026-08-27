@@ -58,8 +58,8 @@ export const Dashboard: React.FC = () => {
   const dangerSubjects = subjects.filter((s) => s.status === 'MUST_ATTEND').length;
 
   const getOverallStatus = () => {
-    if (overallPercentage >= settings.targetThreshold + 5) return 'SAFE';
-    if (overallPercentage >= settings.targetThreshold) return 'RISKY';
+    if (overallPercentage > settings.targetThreshold + 5) return 'SAFE';
+    if (overallPercentage > settings.targetThreshold) return 'RISKY';
     return 'MUST_ATTEND';
   };
 

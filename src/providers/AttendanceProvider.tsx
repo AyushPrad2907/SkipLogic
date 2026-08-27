@@ -59,8 +59,8 @@ export function calculateSubjectStats(
   if (totalDelivered > 0) {
     currentPercentage = (totalAttended / totalDelivered) * 100;
     
-    if (currentPercentage >= targetThreshold) {
-      bunkLimit = Math.max(0, Math.floor((100 * totalAttended - targetThreshold * totalDelivered) / targetThreshold));
+    if (currentPercentage > targetThreshold) {
+      bunkLimit = Math.max(0, Math.ceil((100 * totalAttended - targetThreshold * totalDelivered) / targetThreshold) - 1);
       recoveryRequired = 0;
       status = bunkLimit > 0 ? 'SAFE' : 'RISKY';
     } else {
@@ -68,7 +68,7 @@ export function calculateSubjectStats(
       const denominator = 100 - targetThreshold;
       recoveryRequired = denominator <= 0 
         ? (totalAttended < totalDelivered ? 999 : 0) // Infinity fallback
-        : Math.max(0, Math.ceil((targetThreshold * totalDelivered - 100 * totalAttended) / denominator));
+        : Math.max(0, Math.floor((targetThreshold * totalDelivered - 100 * totalAttended) / denominator) + 1);
       status = 'MUST_ATTEND';
     }
   } else {
