@@ -90,13 +90,8 @@ export const Setup: React.FC = () => {
     addSubject({
       name: newSubName.trim(),
       code: newSubCode.trim() || undefined,
-      targetThreshold: Number(targetThreshold),
-      totalDelivered: 0,
-      totalAttended: 0,
       color: newSubColor,
-      components: [
-        { id: `comp-th-${Math.random()}`, subjectId: '', name: 'Theory', type: 'LECTURE', totalDelivered: 0, totalAttended: 0 }
-      ],
+      targetThreshold: Number(targetThreshold),
     });
     setNewSubName('');
     setNewSubCode('');

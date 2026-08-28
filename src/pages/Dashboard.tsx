@@ -20,6 +20,7 @@ import {
   Clock
 } from 'lucide-react';
 import { DayOfWeek } from '@/types';
+import { pct } from '@/lib/engine';
 
 export const Dashboard: React.FC = () => {
   const {
@@ -52,7 +53,7 @@ export const Dashboard: React.FC = () => {
   // Stats Calculations
   const totalDelivered = subjects.reduce((acc, s) => acc + s.totalDelivered, 0);
   const totalAttended = subjects.reduce((acc, s) => acc + s.totalAttended, 0);
-  const overallPercentage = totalDelivered > 0 ? (totalAttended / totalDelivered) * 100 : 100;
+  const overallPercentage = pct(totalAttended, totalDelivered) ?? 100;
 
   const safeSubjects = subjects.filter((s) => s.status === 'SAFE').length;
   const dangerSubjects = subjects.filter((s) => s.status === 'MUST_ATTEND').length;

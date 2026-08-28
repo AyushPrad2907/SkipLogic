@@ -5,6 +5,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
 import { RingProgress } from '@/components/ui/RingProgress';
 import { EmptyState } from '@/components/ui/EmptyState';
 import {
@@ -15,16 +16,30 @@ import {
   RotateCcw,
   Sparkles,
   Calculator,
-  Compass
+  Compass,
+  Plus,
+  Edit2,
+  Layers,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { calculateSubjectStats } from '@/providers/AttendanceProvider';
+import { pct } from '@/lib/engine';
+import { checkComponentHasLogs } from '@/lib/components.functions';
 
 export const SubjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { subjects, deleteSubject, logs, revertAttendanceLog, logAttendance } = useAttendance();
+  const {
+    subjects,
+    deleteSubject,
+    addComponent,
+    updateComponent,
+    deleteComponent,
+    logs,
+    revertAttendanceLog
+  } = useAttendance();
 
   // Find subject
   const subject = subjects.find((s) => s.id === id);
@@ -32,6 +47,20 @@ export const SubjectDetail: React.FC = () => {
   // Local state for what-if simulation
   const [simAttended, setSimAttended] = useState<number>(0);
   const [simSkipped, setSimSkipped] = useState<number>(0);
+
+  // Modals state
+  const [isDeleteSubjectModalOpen, setIsDeleteSubjectModalOpen] = useState(false);
+  const [isAddComponentModalOpen, setIsAddComponentModalOpen] = useState(false);
+  const [editingComponent, setEditingComponent] = useState<any | null>(null);
+  const [deletingComponent, setDeletingComponent] = useState<any | null>(null);
+  const [componentHasLogsWarning, setComponentHasLogsWarning] = useState(false);
+
+  // Form states for Component Add/Edit
+  const [compType, setCompType] = useState<string>('PP');
+  const [compName, setCompName] = useState<string>('');
+  const [compAttended, setCompAttended] = useState<number>(0);
+  const [compDelivered, setCompDelivered] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!subject) {
     return (
@@ -52,28 +81,165 @@ export const SubjectDetail: React.FC = () => {
     );
   }
 
-  // Handle deletion
-  const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete ${subject.name}? This will clear all timetable slots and logged history for it.`)) {
-      deleteSubject(subject.id);
+  // Handle Delete Subject
+  const confirmDeleteSubject = async () => {
+    setIsSubmitting(true);
+    try {
+      await deleteSubject(subject.id);
       showToast({
         title: 'Subject Deleted',
-        message: `Successfully removed ${subject.name} and related configuration.`,
+        message: `Successfully removed ${subject.name} and related data.`,
         type: 'warning',
       });
       navigate('/app/subjects');
+    } catch (err: any) {
+      showToast({
+        title: 'Failed to Delete Subject',
+        message: err.message || 'An error occurred while deleting the subject.',
+        type: 'danger',
+      });
+    } finally {
+      setIsSubmitting(false);
+      setIsDeleteSubjectModalOpen(false);
+    }
+  };
+
+  // Open Add Component Modal
+  const handleOpenAddComponent = () => {
+    setCompType('PP');
+    setCompName('');
+    setCompAttended(0);
+    setCompDelivered(0);
+    setIsAddComponentModalOpen(true);
+  };
+
+  // Open Edit Component Modal
+  const handleOpenEditComponent = (comp: any) => {
+    setEditingComponent(comp);
+    setCompType(comp.type);
+    setCompName(comp.name || '');
+    setCompAttended(comp.totalAttended);
+    setCompDelivered(comp.totalDelivered);
+  };
+
+  // Open Delete Component Confirmation Modal
+  const handleOpenDeleteComponent = async (comp: any) => {
+    setDeletingComponent(comp);
+    const hasLogs = await checkComponentHasLogs(comp.id);
+    setComponentHasLogsWarning(hasLogs);
+  };
+
+  // Submit Add Component
+  const handleSaveAddComponent = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (compType === 'CUSTOM' && !compName.trim()) {
+      showToast({ title: 'Validation Error', message: 'Custom component requires a display name.', type: 'danger' });
+      return;
+    }
+
+    if (compAttended < 0 || compDelivered < 0) {
+      showToast({ title: 'Validation Error', message: 'Counters cannot be negative.', type: 'danger' });
+      return;
+    }
+
+    if (compAttended > compDelivered) {
+      showToast({ title: 'Validation Error', message: 'Attended cannot exceed total delivered.', type: 'danger' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addComponent(subject.id, compType, compName.trim() || undefined, compAttended, compDelivered);
+      setIsAddComponentModalOpen(false);
+      showToast({
+        title: 'Component Added',
+        message: `Added ${compType === 'CUSTOM' ? compName : compType} component.`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      showToast({
+        title: 'Failed to Add Component',
+        message: err.message || 'An error occurred.',
+        type: 'danger',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Submit Edit Component
+  const handleSaveEditComponent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingComponent) return;
+
+    if (compAttended < 0 || compDelivered < 0) {
+      showToast({ title: 'Validation Error', message: 'Counters cannot be negative.', type: 'danger' });
+      return;
+    }
+
+    if (compAttended > compDelivered) {
+      showToast({ title: 'Validation Error', message: 'Attended cannot exceed total delivered.', type: 'danger' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await updateComponent(editingComponent.id, subject.id, {
+        type: compType,
+        name: compName.trim() || undefined,
+        attended: compAttended,
+        delivered: compDelivered,
+      });
+      setEditingComponent(null);
+      showToast({
+        title: 'Component Updated',
+        message: 'Updated component configuration.',
+        type: 'success',
+      });
+    } catch (err: any) {
+      showToast({
+        title: 'Failed to Update Component',
+        message: err.message || 'An error occurred.',
+        type: 'danger',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Confirm Delete Component
+  const handleConfirmDeleteComponent = async () => {
+    if (!deletingComponent) return;
+    setIsSubmitting(true);
+    try {
+      await deleteComponent(deletingComponent.id, subject.id);
+      setDeletingComponent(null);
+      showToast({
+        title: 'Component Removed',
+        message: 'Successfully deleted component.',
+        type: 'warning',
+      });
+    } catch (err: any) {
+      showToast({
+        title: 'Failed to Delete Component',
+        message: err.message || 'An error occurred.',
+        type: 'danger',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Filter logs for this subject
   const subjectLogs = logs.filter((log) => log.subjectId === subject.id);
 
-  // What-if simulator calculations
+  // What-if simulator calculations using Phase 4 engine
   const totalAttendedSim = subject.totalAttended + simAttended;
   const totalDeliveredSim = subject.totalDelivered + simAttended + simSkipped;
-  const simulatedPercentage = totalDeliveredSim > 0 ? (totalAttendedSim / totalDeliveredSim) * 100 : 100;
+  const simulatedPercentage = pct(totalAttendedSim, totalDeliveredSim) ?? 100;
 
-  // Recalculate stats on simulated numbers
+  // Recalculate stats on simulated numbers using Phase 4 engine
   const simulatedSubject = calculateSubjectStats(
     {
       ...subject,
@@ -86,11 +252,10 @@ export const SubjectDetail: React.FC = () => {
   // Semester Prediction (Assuming double current classes left)
   const remainingExpectedDelivered = 15;
   const predictedEndDelivered = subject.totalDelivered + remainingExpectedDelivered;
-  // If we assume a constant attendance rate:
   const predictedEndAttended = subject.totalDelivered > 0
     ? Math.round((subject.totalAttended / subject.totalDelivered) * predictedEndDelivered)
     : remainingExpectedDelivered;
-  const predictedEndPercentage = predictedEndDelivered > 0 ? (predictedEndAttended / predictedEndDelivered) * 100 : 100;
+  const predictedEndPercentage = pct(predictedEndAttended, predictedEndDelivered) ?? 100;
 
   const badgeVariants = {
     SAFE: 'safe' as const,
@@ -98,6 +263,8 @@ export const SubjectDetail: React.FC = () => {
     MUST_ATTEND: 'danger' as const,
     NEUTRAL: 'neutral' as const,
   };
+
+  const supportedTypes = ['PP', 'PR', 'TUT', 'LAB', 'THEORY', 'CUSTOM'];
 
   return (
     <div className="space-y-6">
@@ -121,7 +288,11 @@ export const SubjectDetail: React.FC = () => {
             )}
           </div>
         </div>
-        <Button variant="ghost" onClick={handleDelete} className="h-9 text-text-muted hover:text-danger hover:bg-danger-muted/10 border border-transparent hover:border-danger/20 flex items-center gap-1.5 cursor-pointer">
+        <Button
+          variant="ghost"
+          onClick={() => setIsDeleteSubjectModalOpen(true)}
+          className="h-9 text-text-muted hover:text-danger hover:bg-danger-muted/10 border border-transparent hover:border-danger/20 flex items-center gap-1.5 cursor-pointer"
+        >
           <Trash2 className="h-4 w-4" /> Delete Course
         </Button>
       </div>
@@ -138,7 +309,7 @@ export const SubjectDetail: React.FC = () => {
             subLabel="Overall"
           />
           <div className="mt-4">
-            <span className="text-xs text-text-secondary">Current Score:</span>
+            <span className="text-xs text-text-secondary">Combined Attendance:</span>
             <div className="font-mono text-2xl font-bold mt-0.5">
               {subject.totalAttended} / {subject.totalDelivered} <span className="text-text-muted text-xs">classes</span>
             </div>
@@ -167,7 +338,7 @@ export const SubjectDetail: React.FC = () => {
                 {subject.bunkLimit} {subject.bunkLimit === 1 ? 'class' : 'classes'}
               </div>
               <p className="text-[10px] text-text-secondary mt-1 leading-normal">
-                You can miss these upcoming classes consecutively and still stay above {subject.targetThreshold}%.
+                You can miss these upcoming classes consecutively and still stay strictly above {subject.targetThreshold}%.
               </p>
             </div>
 
@@ -177,41 +348,95 @@ export const SubjectDetail: React.FC = () => {
                 {subject.recoveryRequired} {subject.recoveryRequired === 1 ? 'class' : 'classes'}
               </div>
               <p className="text-[10px] text-text-secondary mt-1 leading-normal">
-                Consecutive lectures you must attend to pull attendance back up to {subject.targetThreshold}%.
+                Consecutive lectures you must attend to pull attendance strictly above {subject.targetThreshold}%.
               </p>
             </div>
           </div>
-
-          {/* Quick manual logging from page */}
-          <div className="flex items-center gap-2 pt-2">
-            <span className="text-xs font-semibold text-text-secondary">Log attendance for today:</span>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                const todayStr = new Date().toISOString().split('T')[0];
-                logAttendance(subject.id, 'LECTURE', 'ATTENDED', todayStr);
-                showToast({ title: 'Logged Attended', message: 'Calculated attendance updated.', type: 'success' });
-              }}
-              className="h-8 text-xs text-safe border-safe/20 hover:bg-safe-muted cursor-pointer"
-            >
-              Attended
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                const todayStr = new Date().toISOString().split('T')[0];
-                logAttendance(subject.id, 'LECTURE', 'BUNKED', todayStr);
-                showToast({ title: 'Logged Bunked', message: 'Calculated buffer updated.', type: 'warning' });
-              }}
-              className="h-8 text-xs text-danger border-danger/20 hover:bg-danger-muted cursor-pointer"
-            >
-              Bunked
-            </Button>
-          </div>
         </Card>
       </div>
+
+      {/* COMPONENT BREAKDOWN PANEL */}
+      <Card className="p-5 border-border/80 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-3 gap-2">
+          <div className="flex items-center gap-2">
+            <Layers className="h-4.5 w-4.5 text-brand" />
+            <h3 className="text-sm font-bold text-text-primary">Component Breakdown</h3>
+          </div>
+          <Button size="sm" onClick={handleOpenAddComponent} className="flex items-center gap-1 cursor-pointer self-start sm:self-auto">
+            <Plus className="h-4 w-4" /> Add Component
+          </Button>
+        </div>
+
+        {!subject.components || subject.components.length === 0 ? (
+          <div className="py-6">
+            <EmptyState
+              title="No attendance components configured"
+              description="Add PP, PR, TUT, LAB or Theory to begin tracking subject breakdown."
+              icon={<Layers className="h-6 w-6 text-brand" />}
+              action={
+                <Button size="sm" onClick={handleOpenAddComponent} className="flex items-center gap-1 cursor-pointer mx-auto">
+                  <Plus className="h-4 w-4" /> Add Component
+                </Button>
+              }
+            />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="divide-y divide-border/40 border border-border/50 rounded-lg overflow-hidden bg-background">
+              {subject.components.map((comp) => {
+                const compPct = pct(comp.totalAttended, comp.totalDelivered);
+                return (
+                  <div key={comp.id} className="p-3.5 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-surface-elevated border border-border text-brand">
+                        {comp.type}
+                      </span>
+                      <div>
+                        <h4 className="text-sm font-semibold text-text-primary">{comp.name || comp.type}</h4>
+                        <span className="text-[10px] text-text-muted font-mono">
+                          {comp.totalAttended} / {comp.totalDelivered} classes
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <span className="font-mono text-sm font-bold text-text-primary">
+                        {compPct === null ? 'N/A' : `${compPct.toFixed(1)}%`}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenEditComponent(comp)}
+                          className="h-8 w-8 p-0 text-text-muted hover:text-text-primary rounded cursor-pointer"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenDeleteComponent(comp)}
+                          className="h-8 w-8 p-0 text-text-muted hover:text-danger rounded cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Combined Totals Rule Notification */}
+            <div className="bg-surface-elevated/40 p-3 rounded-lg border border-border/40 flex items-start gap-2.5 text-xs text-text-secondary leading-relaxed">
+              <Info className="h-4 w-4 text-brand shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-text-primary">Combined Total Rule:</span> Subject percentage ({subject.currentPercentage.toFixed(2)}%) is based on the <strong>COMBINED raw totals</strong> ({subject.totalAttended} / {subject.totalDelivered}), not an average of component percentages.
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Grid: What-If Simulator & Predictions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -226,7 +451,6 @@ export const SubjectDetail: React.FC = () => {
           </p>
 
           <div className="space-y-4 pt-2">
-            {/* Simulate Attending */}
             <div>
               <div className="flex justify-between items-center mb-1 text-xs">
                 <span className="text-text-secondary font-medium">Future Classes to Attend:</span>
@@ -242,7 +466,6 @@ export const SubjectDetail: React.FC = () => {
               />
             </div>
 
-            {/* Simulate Bunking */}
             <div>
               <div className="flex justify-between items-center mb-1 text-xs">
                 <span className="text-text-secondary font-medium">Future Classes to Skip:</span>
@@ -258,7 +481,6 @@ export const SubjectDetail: React.FC = () => {
               />
             </div>
 
-            {/* Simulated Output Panel */}
             <div className="bg-surface-elevated/40 p-3 rounded-lg border border-border/50 flex items-center justify-between mt-4">
               <div>
                 <span className="text-[10px] text-text-muted uppercase font-mono tracking-wider font-semibold">Simulated Outcome</span>
@@ -293,7 +515,7 @@ export const SubjectDetail: React.FC = () => {
           </div>
         </Card>
 
-        {/* Semester Predictions & Subject details */}
+        {/* Semester Predictions */}
         <Card className="p-5 border-border/80 space-y-4">
           <h3 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-3 mb-1">
             <Compass className="h-4.5 w-4.5 text-brand" /> Semester Prediction
@@ -317,7 +539,7 @@ export const SubjectDetail: React.FC = () => {
               <span className="text-text-secondary font-semibold">Predicted Outcome:</span>
               <span className={cn(
                 'font-mono font-bold text-base',
-                predictedEndPercentage >= subject.targetThreshold ? 'text-safe' : 'text-danger'
+                predictedEndPercentage > subject.targetThreshold ? 'text-safe' : 'text-danger'
               )}>
                 {predictedEndPercentage.toFixed(1)}%
               </span>
@@ -385,6 +607,229 @@ export const SubjectDetail: React.FC = () => {
           </div>
         </Card>
       )}
+
+      {/* ADD COMPONENT MODAL */}
+      <Modal
+        isOpen={isAddComponentModalOpen}
+        onClose={() => !isSubmitting && setIsAddComponentModalOpen(false)}
+        title="Add Component"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setIsAddComponentModalOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAddComponent} disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Add Component'}
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleSaveAddComponent} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+              Component Type <span className="text-danger">*</span>
+            </label>
+            <select
+              value={compType}
+              onChange={(e) => setCompType(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+              disabled={isSubmitting}
+            >
+              {supportedTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t === 'PP' ? 'PP (Practical / Lab)' : t === 'PR' ? 'PR (Practical)' : t === 'TUT' ? 'TUT (Tutorial)' : t}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {compType === 'CUSTOM' && (
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                Custom Component Name <span className="text-danger">*</span>
+              </label>
+              <input
+                type="text"
+                value={compName}
+                onChange={(e) => setCompName(e.target.value)}
+                placeholder="e.g. Workshop / Seminar"
+                className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+                disabled={isSubmitting}
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4 border-t border-border/40 pt-3">
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                Attended Classes
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={compAttended}
+                onChange={(e) => setCompAttended(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+                disabled={isSubmitting}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                Total Delivered
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={compDelivered}
+                onChange={(e) => setCompDelivered(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* EDIT COMPONENT MODAL */}
+      <Modal
+        isOpen={!!editingComponent}
+        onClose={() => !isSubmitting && setEditingComponent(null)}
+        title="Edit Component"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setEditingComponent(null)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEditComponent} disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleSaveEditComponent} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+              Component Type
+            </label>
+            <select
+              value={compType}
+              onChange={(e) => setCompType(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+              disabled={isSubmitting}
+            >
+              {supportedTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+              Display Name
+            </label>
+            <input
+              type="text"
+              value={compName}
+              onChange={(e) => setCompName(e.target.value)}
+              placeholder="e.g. Theory / Lab"
+              className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 border-t border-border/40 pt-3">
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                Attended Classes
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={compAttended}
+                onChange={(e) => setCompAttended(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+                disabled={isSubmitting}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                Total Delivered
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={compDelivered}
+                onChange={(e) => setCompDelivered(Number(e.target.value))}
+                className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* DELETE COMPONENT CONFIRMATION MODAL */}
+      <Modal
+        isOpen={!!deletingComponent}
+        onClose={() => !isSubmitting && setDeletingComponent(null)}
+        title="Delete Component"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setDeletingComponent(null)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleConfirmDeleteComponent} disabled={isSubmitting}>
+              {isSubmitting ? 'Deleting...' : 'Confirm Delete'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-text-primary">
+            Are you sure you want to delete component <strong>{deletingComponent?.name || deletingComponent?.type}</strong>?
+          </p>
+
+          {componentHasLogsWarning && (
+            <div className="bg-danger-muted/20 border border-danger/30 p-3 rounded-lg flex items-start gap-2 text-xs text-danger">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                Warning: Attendance history/logs exist for this component. Deleting it will update the subject's overall attendance calculations.
+              </span>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* DELETE SUBJECT CONFIRMATION MODAL */}
+      <Modal
+        isOpen={isDeleteSubjectModalOpen}
+        onClose={() => !isSubmitting && setIsDeleteSubjectModalOpen(false)}
+        title="Delete Subject"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setIsDeleteSubjectModalOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={confirmDeleteSubject} disabled={isSubmitting}>
+              {isSubmitting ? 'Deleting...' : 'Delete Subject'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-text-primary">
+            Are you sure you want to delete course <strong>{subject.name}</strong>?
+          </p>
+          <div className="bg-danger-muted/20 border border-danger/30 p-3 rounded-lg flex items-start gap-2 text-xs text-danger">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>
+              This is a destructive action. Deleting this subject will permanently remove all associated components, timetable slots, and logged attendance history.
+            </span>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
