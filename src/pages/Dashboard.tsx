@@ -21,7 +21,7 @@ import {
   History
 } from 'lucide-react';
 import { DayOfWeek } from '@/types';
-import { pct } from '@/lib/engine';
+import { pct, calculateClassSkipImpact } from '@/lib/engine';
 
 export const Dashboard: React.FC = () => {
   const {
@@ -275,6 +275,9 @@ export const Dashboard: React.FC = () => {
               const ifAttended = ((currentAttended + 1) / (currentDelivered + 1)) * 100;
               const ifSkipped = (currentAttended / (currentDelivered + 1)) * 100;
 
+              // Canonical Phase 4/10 skip impact recommendation
+              const skipImpact = calculateClassSkipImpact(currentAttended, currentDelivered, settings.targetThreshold);
+
               return (
                 <DecisionCard
                   key={slot.id}
@@ -287,7 +290,7 @@ export const Dashboard: React.FC = () => {
                   currentPercentage={subject.currentPercentage}
                   ifAttendedPercentage={ifAttended}
                   ifSkippedPercentage={ifSkipped}
-                  recommendation={subject.status}
+                  recommendation={skipImpact.recommendation}
                   currentStatus={currentStatus}
                   isSubmitting={submittingSlotId === slot.id}
                   onLogAttendance={(status) =>

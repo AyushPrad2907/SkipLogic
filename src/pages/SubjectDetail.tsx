@@ -14,17 +14,17 @@ import {
   AlertTriangle,
   Clock,
   RotateCcw,
-  Sparkles,
   Calculator,
   Compass,
   Plus,
   Edit2,
   Layers,
-  Info
+  Info,
+  Calendar,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { calculateSubjectStats } from '@/providers/AttendanceProvider';
-import { pct } from '@/lib/engine';
+import { pct, simulateWhatIfScenario, WhatIfScenario, ComponentFutureSummary, FutureClassOccurrence } from '@/lib/engine';
 import { checkComponentHasLogs } from '@/lib/components.functions';
 
 export const SubjectDetail: React.FC = () => {
@@ -38,15 +38,17 @@ export const SubjectDetail: React.FC = () => {
     updateComponent,
     deleteComponent,
     logs,
-    revertAttendanceLog
+    revertAttendanceLog,
+    getSubjectPrediction,
   } = useAttendance();
 
   // Find subject
   const subject = subjects.find((s) => s.id === id);
+  const prediction = subject ? getSubjectPrediction(subject.id) : null;
 
-  // Local state for what-if simulation
-  const [simAttended, setSimAttended] = useState<number>(0);
-  const [simSkipped, setSimSkipped] = useState<number>(0);
+  // Local state for what-if simulation scenario
+  const [selectedScenarioType, setSelectedScenarioType] = useState<'ATTEND_NEXT' | 'MISS_NEXT' | 'ATTEND_ALL' | 'MISS_ALL' | 'CUSTOM'>('ATTEND_NEXT');
+  const [customMissCount] = useState<number>(1);
 
   // Modals state
   const [isDeleteSubjectModalOpen, setIsDeleteSubjectModalOpen] = useState(false);
@@ -234,29 +236,6 @@ export const SubjectDetail: React.FC = () => {
   // Filter logs for this subject
   const subjectLogs = logs.filter((log) => log.subjectId === subject.id);
 
-  // What-if simulator calculations using Phase 4 engine
-  const totalAttendedSim = subject.totalAttended + simAttended;
-  const totalDeliveredSim = subject.totalDelivered + simAttended + simSkipped;
-  const simulatedPercentage = pct(totalAttendedSim, totalDeliveredSim) ?? 100;
-
-  // Recalculate stats on simulated numbers using Phase 4 engine
-  const simulatedSubject = calculateSubjectStats(
-    {
-      ...subject,
-      totalAttended: totalAttendedSim,
-      totalDelivered: totalDeliveredSim,
-    },
-    subject.targetThreshold
-  );
-
-  // Semester Prediction (Assuming double current classes left)
-  const remainingExpectedDelivered = 15;
-  const predictedEndDelivered = subject.totalDelivered + remainingExpectedDelivered;
-  const predictedEndAttended = subject.totalDelivered > 0
-    ? Math.round((subject.totalAttended / subject.totalDelivered) * predictedEndDelivered)
-    : remainingExpectedDelivered;
-  const predictedEndPercentage = pct(predictedEndAttended, predictedEndDelivered) ?? 100;
-
   const badgeVariants = {
     SAFE: 'safe' as const,
     RISKY: 'risk' as const,
@@ -304,7 +283,7 @@ export const SubjectDetail: React.FC = () => {
         <Card className="flex flex-col items-center justify-center p-6 text-center border-border/80 md:col-span-1">
           <RingProgress
             value={subject.currentPercentage}
-            status={subject.status}
+            status={prediction?.status === 'UNRECOVERABLE' ? 'MUST_ATTEND' : subject.status}
             size="lg"
             subLabel="Overall"
           />
@@ -323,11 +302,19 @@ export const SubjectDetail: React.FC = () => {
               <span className="text-xs font-mono uppercase text-text-secondary tracking-wide">SkipLogic Decision</span>
               <h3 className="text-base font-bold text-text-primary mt-0.5">Boundary Diagnosis</h3>
             </div>
-            <Badge variant={badgeVariants[subject.status]} className="text-xs uppercase tracking-wide">
-              {subject.status === 'SAFE' && 'Buffer Available'}
-              {subject.status === 'RISKY' && 'Risk boundary'}
-              {subject.status === 'MUST_ATTEND' && 'Deficit recovery'}
-              {subject.status === 'NEUTRAL' && 'No logs yet'}
+            <Badge
+              variant={
+                prediction?.status === 'UNRECOVERABLE'
+                  ? 'danger'
+                  : badgeVariants[subject.status]
+              }
+              className="text-xs uppercase tracking-wide"
+            >
+              {prediction?.status === 'UNRECOVERABLE' && 'RECOVERY IMPOSSIBLE'}
+              {prediction?.status !== 'UNRECOVERABLE' && subject.status === 'SAFE' && 'Buffer Available'}
+              {prediction?.status !== 'UNRECOVERABLE' && subject.status === 'RISKY' && 'Risk boundary'}
+              {prediction?.status !== 'UNRECOVERABLE' && subject.status === 'MUST_ATTEND' && 'Deficit recovery'}
+              {prediction?.status !== 'UNRECOVERABLE' && subject.status === 'NEUTRAL' && 'No logs yet'}
             </Badge>
           </div>
 
@@ -335,20 +322,30 @@ export const SubjectDetail: React.FC = () => {
             <div className="bg-surface-elevated/40 p-3 rounded-lg border border-border/30">
               <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">Safe Bunk Limit</span>
               <div className="font-mono text-xl font-bold text-safe mt-1">
-                {subject.bunkLimit} {subject.bunkLimit === 1 ? 'class' : 'classes'}
+                {prediction ? prediction.bunkLimitFuture : subject.bunkLimit} {(prediction ? prediction.bunkLimitFuture : subject.bunkLimit) === 1 ? 'class' : 'classes'}
               </div>
               <p className="text-[10px] text-text-secondary mt-1 leading-normal">
-                You can miss these upcoming classes consecutively and still stay strictly above {subject.targetThreshold}%.
+                Future classes you can skip while staying strictly above {subject.targetThreshold}%.
               </p>
             </div>
 
             <div className="bg-surface-elevated/40 p-3 rounded-lg border border-border/30">
               <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">Recovery Required</span>
-              <div className={cn('font-mono text-xl font-bold mt-1', subject.recoveryRequired > 0 ? 'text-danger' : 'text-text-muted')}>
-                {subject.recoveryRequired} {subject.recoveryRequired === 1 ? 'class' : 'classes'}
+              <div className={cn('font-mono text-xl font-bold mt-1', (prediction?.recoveryClassesNeeded || 0) > 0 ? 'text-danger' : 'text-text-muted')}>
+                {prediction ? prediction.recoveryClassesNeeded : subject.recoveryRequired} {(prediction ? prediction.recoveryClassesNeeded : subject.recoveryRequired) === 1 ? 'class' : 'classes'}
               </div>
               <p className="text-[10px] text-text-secondary mt-1 leading-normal">
-                Consecutive lectures you must attend to pull attendance strictly above {subject.targetThreshold}%.
+                {prediction?.recoveryDate ? (
+                  <span className="text-safe font-semibold">
+                    📅 Crosses threshold on {prediction.recoveryDate}
+                  </span>
+                ) : prediction && !prediction.recoverable ? (
+                  <span className="text-danger font-semibold">
+                    ⚠️ Recovery mathematically impossible this semester
+                  </span>
+                ) : (
+                  `Consecutive lectures to attend to reach > ${subject.targetThreshold}%.`
+                )}
               </p>
             </div>
           </div>
@@ -360,7 +357,7 @@ export const SubjectDetail: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-3 gap-2">
           <div className="flex items-center gap-2">
             <Layers className="h-4.5 w-4.5 text-brand" />
-            <h3 className="text-sm font-bold text-text-primary">Component Breakdown</h3>
+            <h3 className="text-sm font-bold text-text-primary">Component Breakdown & Future Classes</h3>
           </div>
           <Button size="sm" onClick={handleOpenAddComponent} className="flex items-center gap-1 cursor-pointer self-start sm:self-auto">
             <Plus className="h-4 w-4" /> Add Component
@@ -385,6 +382,7 @@ export const SubjectDetail: React.FC = () => {
             <div className="divide-y divide-border/40 border border-border/50 rounded-lg overflow-hidden bg-background">
               {subject.components.map((comp) => {
                 const compPct = pct(comp.totalAttended, comp.totalDelivered);
+                const compFuture = prediction?.futureClassesByComponent.find((f: ComponentFutureSummary) => f.componentId === comp.id);
                 return (
                   <div key={comp.id} className="p-3.5 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -394,7 +392,8 @@ export const SubjectDetail: React.FC = () => {
                       <div>
                         <h4 className="text-sm font-semibold text-text-primary">{comp.name || comp.type}</h4>
                         <span className="text-[10px] text-text-muted font-mono">
-                          {comp.totalAttended} / {comp.totalDelivered} classes
+                          {comp.totalAttended} / {comp.totalDelivered} delivered
+                          {compFuture && ` • ${compFuture.futureCount} future classes remaining`}
                         </span>
                       </div>
                     </div>
@@ -447,72 +446,87 @@ export const SubjectDetail: React.FC = () => {
             <Calculator className="h-4.5 w-4.5 text-brand" /> What-If Simulator
           </h3>
           <p className="text-xs text-text-secondary">
-            Simulate attending or skipping future classes to preview percentage boundary changes.
+            Simulate future attendance scenarios using the deterministic Phase 10 timetable engine.
           </p>
 
-          <div className="space-y-4 pt-2">
-            <div>
-              <div className="flex justify-between items-center mb-1 text-xs">
-                <span className="text-text-secondary font-medium">Future Classes to Attend:</span>
-                <span className="font-mono font-bold text-safe">{simAttended}</span>
+          {prediction ? (
+            <div className="space-y-4 pt-1">
+              {/* Preset Scenario Buttons */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Button
+                  size="sm"
+                  variant={selectedScenarioType === 'ATTEND_NEXT' ? 'primary' : 'ghost'}
+                  onClick={() => setSelectedScenarioType('ATTEND_NEXT')}
+                  className="text-xs font-mono py-1.5 cursor-pointer"
+                >
+                  Attend Next
+                </Button>
+                <Button
+                  size="sm"
+                  variant={selectedScenarioType === 'MISS_NEXT' ? 'danger' : 'ghost'}
+                  onClick={() => setSelectedScenarioType('MISS_NEXT')}
+                  className="text-xs font-mono py-1.5 cursor-pointer"
+                >
+                  Miss Next
+                </Button>
+                <Button
+                  size="sm"
+                  variant={selectedScenarioType === 'ATTEND_ALL' ? 'primary' : 'ghost'}
+                  onClick={() => setSelectedScenarioType('ATTEND_ALL')}
+                  className="text-xs font-mono py-1.5 cursor-pointer"
+                >
+                  Attend All
+                </Button>
+                <Button
+                  size="sm"
+                  variant={selectedScenarioType === 'MISS_ALL' ? 'danger' : 'ghost'}
+                  onClick={() => setSelectedScenarioType('MISS_ALL')}
+                  className="text-xs font-mono py-1.5 cursor-pointer"
+                >
+                  Miss All
+                </Button>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="20"
-                value={simAttended}
-                onChange={(e) => setSimAttended(Number(e.target.value))}
-                className="w-full h-1.5 bg-surface-elevated rounded-lg appearance-none cursor-pointer accent-safe"
-              />
-            </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-1 text-xs">
-                <span className="text-text-secondary font-medium">Future Classes to Skip:</span>
-                <span className="font-mono font-bold text-danger">{simSkipped}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="20"
-                value={simSkipped}
-                onChange={(e) => setSimSkipped(Number(e.target.value))}
-                className="w-full h-1.5 bg-surface-elevated rounded-lg appearance-none cursor-pointer accent-danger"
-              />
-            </div>
+              {/* Simulation Result */}
+              {(() => {
+                const scenarioInput: WhatIfScenario =
+                  selectedScenarioType === 'CUSTOM'
+                    ? { type: 'MISS_N', count: customMissCount }
+                    : { type: selectedScenarioType };
+                const simRes = simulateWhatIfScenario(prediction, scenarioInput);
 
-            <div className="bg-surface-elevated/40 p-3 rounded-lg border border-border/50 flex items-center justify-between mt-4">
-              <div>
-                <span className="text-[10px] text-text-muted uppercase font-mono tracking-wider font-semibold">Simulated Outcome</span>
-                <div className="font-mono text-2xl font-bold mt-0.5">
-                  {simulatedPercentage.toFixed(1)}%
-                </div>
-                <span className="text-[9px] text-text-secondary mt-1 block font-mono">
-                  {totalAttendedSim} / {totalDeliveredSim} classes
-                </span>
-              </div>
-              
-              <div className="flex flex-col items-end gap-1.5">
-                <Badge variant={badgeVariants[simulatedSubject.status]} className="text-[10px] uppercase font-bold tracking-wider">
-                  {simulatedSubject.status === 'SAFE' && 'SAFE BUNK'}
-                  {simulatedSubject.status === 'RISKY' && 'RISK LINE'}
-                  {simulatedSubject.status === 'MUST_ATTEND' && 'MUST ATTEND'}
-                  {simulatedSubject.status === 'NEUTRAL' && 'NEUTRAL'}
-                </Badge>
-                {(simAttended > 0 || simSkipped > 0) && (
-                  <button
-                    onClick={() => {
-                      setSimAttended(0);
-                      setSimSkipped(0);
-                    }}
-                    className="text-[10px] text-brand hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-                  >
-                    <RotateCcw className="h-3 w-3" /> Reset Sim
-                  </button>
-                )}
-              </div>
+                return (
+                  <div className="bg-surface-elevated/40 p-4 rounded-lg border border-border/50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-text-muted uppercase font-mono tracking-wider font-semibold">Simulated Outcome</span>
+                        <div className="font-mono text-2xl font-bold mt-0.5">
+                          {simRes.simulatedPercentage !== null ? `${simRes.simulatedPercentage.toFixed(2)}%` : 'N/A'}
+                        </div>
+                        <span className="text-[10px] text-text-secondary mt-0.5 block font-mono">
+                          {simRes.simulatedAttended} / {simRes.simulatedDelivered} classes
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Badge
+                          variant={simRes.simulatedEligible ? 'safe' : 'danger'}
+                          className="text-[10px] uppercase font-bold tracking-wider"
+                        >
+                          {simRes.simulatedEligible ? 'ELIGIBLE (> 75%)' : 'INELIGIBLE (≤ 75%)'}
+                        </Badge>
+                        <span className="text-[10px] font-mono text-text-muted">
+                          Margin: {simRes.margin !== null && simRes.margin >= 0 ? `+${simRes.margin}%` : `${simRes.margin}%`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-          </div>
+          ) : (
+            <p className="text-xs text-text-muted">No prediction available.</p>
+          )}
         </Card>
 
         {/* Semester Predictions */}
@@ -521,39 +535,76 @@ export const SubjectDetail: React.FC = () => {
             <Compass className="h-4.5 w-4.5 text-brand" /> Semester Prediction
           </h3>
           <p className="text-xs text-text-secondary">
-            Predictive estimates of attendance based on your current run rate.
+            Deterministic estimates based on future timetable walker.
           </p>
 
           <div className="space-y-3.5 pt-2 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-text-secondary">Current Attendance Run Rate:</span>
-              <span className="font-mono font-bold">{subject.currentPercentage.toFixed(1)}%</span>
+              <span className="text-text-secondary">Remaining Future Classes:</span>
+              <span className="font-mono font-bold text-brand">{prediction?.futureClassesTotal ?? 0} classes</span>
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-text-secondary">Predicted End of Semester Classes:</span>
-              <span className="font-mono font-bold text-text-primary">{predictedEndDelivered} total</span>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border/40 pt-2.5">
-              <span className="text-text-secondary font-semibold">Predicted Outcome:</span>
-              <span className={cn(
-                'font-mono font-bold text-base',
-                predictedEndPercentage > subject.targetThreshold ? 'text-safe' : 'text-danger'
-              )}>
-                {predictedEndPercentage.toFixed(1)}%
+              <span className="text-text-secondary">Best Possible Outcome (Attend All):</span>
+              <span className="font-mono font-bold text-safe">
+                {prediction?.bestPossiblePercentage !== null ? `${prediction?.bestPossiblePercentage}%` : 'N/A'}
               </span>
             </div>
 
-            <div className="bg-surface-elevated/40 p-2.5 rounded-lg border border-border/30 mt-2 text-[10px] text-text-muted flex items-start gap-2 leading-relaxed">
-              <Sparkles className="h-4 w-4 text-brand shrink-0 mt-0.5 animate-pulse" />
-              <span>
-                Based on historical patterns, you are estimated to finish this course above your threshold. Keep maintaining the current attendance rate.
+            <div className="flex items-center justify-between">
+              <span className="text-text-secondary">Worst Possible Outcome (Miss All):</span>
+              <span className="font-mono font-bold text-danger">
+                {prediction?.worstPossiblePercentage !== null ? `${prediction?.worstPossiblePercentage}%` : 'N/A'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-border/40 pt-2.5">
+              <span className="text-text-secondary font-semibold">Recoverability Status:</span>
+              <span className={cn('font-mono font-bold text-xs px-2 py-0.5 rounded border',
+                prediction?.recoverable ? 'bg-safe-muted border-safe/30 text-safe' : 'bg-danger-muted border-danger/30 text-danger'
+              )}>
+                {prediction?.recoverable ? '🟢 RECOVERABLE' : '🔴 UNRECOVERABLE'}
               </span>
             </div>
           </div>
         </Card>
       </div>
+
+      {/* Safe Bunk Plan */}
+      {prediction && prediction.safeBunkPlan.length > 0 && (
+        <Card className="p-5 border-border/80 space-y-3">
+          <div className="flex items-center justify-between border-b border-border/50 pb-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4.5 w-4.5 text-safe" />
+              <h3 className="text-sm font-bold text-text-primary">Safe Bunk Plan</h3>
+            </div>
+            <Badge variant="safe" className="font-mono text-xs">
+              {prediction.safeBunkPlan.length} safe skips available
+            </Badge>
+          </div>
+
+          <p className="text-xs text-text-secondary">
+            Specific future class occurrences you can skip while remaining strictly above {subject.targetThreshold}%.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-2">
+            {prediction.safeBunkPlan.map((occ: FutureClassOccurrence) => (
+              <div key={occ.id} className="p-3 rounded-lg border border-border/50 bg-surface-elevated/40 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] font-bold text-brand bg-brand-muted/20 px-1.5 py-0.5 rounded">
+                    {occ.componentType} ({occ.componentName || 'Theory'})
+                  </span>
+                  <span className="font-mono text-[10px] text-text-muted">{occ.startTime} - {occ.endTime}</span>
+                </div>
+                <div className="text-xs font-semibold text-text-primary flex items-center gap-1.5 pt-1">
+                  <Calendar className="h-3.5 w-3.5 text-text-muted" />
+                  {occ.date} ({occ.dayOfWeek})
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* History Log */}
       {subjectLogs.length > 0 && (

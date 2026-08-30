@@ -14,6 +14,7 @@ import {
   recoveryNeeded as engineRecoveryNeeded,
   recommendation as engineRecommendation,
   calculateSubjectAttendance,
+  predictSubject as enginePredictSubject,
 } from '@/lib/engine';
 import { supabase } from '@/lib/supabase';
 import { getActiveSemester } from '@/lib/semesters.functions';
@@ -106,6 +107,7 @@ interface AttendanceContextType {
   loadMockData: () => void;
   resetAllData: () => void;
   refreshData: () => Promise<void>;
+  getSubjectPrediction: (subjectId: string) => any;
 }
 
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
@@ -478,6 +480,47 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
     await refreshData();
   }, [refreshData]);
 
+  const getSubjectPrediction = useCallback((subjectId: string) => {
+    const sub = subjects.find((s) => s.id === subjectId);
+    if (!sub) return null;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const timetableSlotInputs = timetable.map((slot) => ({
+      id: slot.id,
+      subjectId: slot.subjectId,
+      componentId: slot.componentId || '',
+      componentType: slot.componentType as any,
+      componentName: slot.componentName,
+      dayOfWeek: slot.day,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      room: slot.room,
+      faculty: slot.instructor,
+    }));
+
+    const comps = (sub.components || []).map((c) => ({
+      id: c.id,
+      type: c.type,
+      name: c.name,
+      attended: c.totalAttended,
+      delivered: c.totalDelivered,
+    }));
+
+    return enginePredictSubject(
+      sub.id,
+      comps,
+      settings.targetThreshold,
+      {
+        startDate: settings.startDate,
+        endDate: settings.endDate,
+        currentDate: todayStr,
+        workingDays: settings.workingDays,
+        holidays: settings.holidays,
+        timetableSlots: timetableSlotInputs,
+      }
+    );
+  }, [subjects, timetable, settings]);
+
   const updateSettings = useCallback((newSettings: SemesterSettings) => {
     setSettings(newSettings);
   }, []);
@@ -516,6 +559,7 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
         loadMockData,
         resetAllData,
         refreshData,
+        getSubjectPrediction,
       }}
     >
       {children}

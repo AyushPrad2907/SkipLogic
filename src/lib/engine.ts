@@ -326,45 +326,24 @@ export function calculateSemesterAttendance(
 }
 
 // ============================================================================
-// FUTURE PREDICTION SYSTEM FOUNDATION
+// FUTURE PREDICTION & SEMESTER INTELLIGENCE (PHASE 10)
 // ============================================================================
 
-export interface TimetableSlotInfo {
-  id: string;
-  subjectId: string;
-  componentType: string;
-  dayOfWeek: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
-}
+export {
+  walkFutureTimetable,
+  predictSubject,
+  simulateWhatIfScenario,
+  parseLocalDate,
+  formatLocalDate,
+  getDayOfWeekFromDate,
+} from './prediction';
 
-export interface FuturePredictionParams {
-  startDate: string;
-  endDate: string;
-  workingDays: string[];
-  holidays: string[];
-  timetableSlots: TimetableSlotInfo[];
-  currentDate: string;
-}
-
-/**
- * Stub/placeholder for predicting future subject attendance.
- * Will be fully implemented in a future dedicated prediction phase.
- */
-export function predictSubject(
-  _components: ComponentAttendance[],
-  _threshold: number,
-  _params: FuturePredictionParams
-): any {
-  // Setup typed placeholder
-  return {
-    predictedPercentage: null,
-    predictedEligible: true,
-  };
-}
-
-/**
- * Stub/placeholder for counting future classes based on timetable.
- * Will be fully implemented in a future dedicated prediction phase.
- */
-export function countFutureClasses(_params: FuturePredictionParams): number {
-  return 0;
-}
+export type {
+  TimetableSlotInput,
+  FutureClassOccurrence,
+  ComponentFutureSummary,
+  SubjectPredictionResult,
+  WhatIfScenario,
+  WhatIfSimulationResult,
+  TimetableWalkerParams,
+} from './prediction';
