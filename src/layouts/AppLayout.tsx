@@ -6,6 +6,7 @@ import {
   Calendar,
   Settings,
   GraduationCap,
+  History,
   LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ export const AppLayout: React.FC = () => {
     { label: 'Dashboard', path: '/app', icon: LayoutDashboard },
     { label: 'Subjects', path: '/app/subjects', icon: BookOpen },
     { label: 'Timetable', path: '/app/timetable', icon: Calendar },
+    { label: 'History', path: '/app/history', icon: History },
     { label: 'Semester', path: '/app/semester', icon: GraduationCap },
   ];
 

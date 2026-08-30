@@ -106,11 +106,10 @@ export const Setup: React.FC = () => {
     const sub = subjects.find(s => s.id === selectedSubId);
     if (!sub) return;
 
+    const firstCompId = sub.components?.[0]?.id || '';
     addTimetableSlot({
       subjectId: selectedSubId,
-      subjectName: sub.name,
-      subjectCode: sub.code,
-      componentType: slotComponent,
+      componentId: firstCompId,
       day: slotDay,
       startTime: slotStartTime,
       endTime: slotEndTime,

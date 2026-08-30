@@ -17,7 +17,8 @@ import {
   Play,
   RotateCcw,
   CheckCircle,
-  Clock
+  Clock,
+  History
 } from 'lucide-react';
 import { DayOfWeek } from '@/types';
 import { pct } from '@/lib/engine';
@@ -37,9 +38,11 @@ export const Dashboard: React.FC = () => {
   const days: DayOfWeek[] = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => {
     const todayIndex = new Date().getDay();
-    // Default to MONDAY if today is Sunday/Saturday and no classes exist, just for review
     return days[todayIndex] === 'SUNDAY' || days[todayIndex] === 'SATURDAY' ? 'MONDAY' : days[todayIndex];
   });
+  const [submittingSlotId, setSubmittingSlotId] = useState<string | null>(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const handleLoadMock = () => {
     loadMockData();
@@ -70,14 +73,47 @@ export const Dashboard: React.FC = () => {
   // Sort slots by start time
   const sortedSlots = [...dailySlots].sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  const handleLog = (subjectId: string, componentType: any, status: 'ATTENDED' | 'BUNKED') => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    logAttendance(subjectId, componentType, status, todayStr);
-    showToast({
-      title: status === 'ATTENDED' ? 'Class Attended' : 'Class Bunked',
-      message: `Updated logs for ${subjects.find(s => s.id === subjectId)?.name || 'subject'}.`,
-      type: status === 'ATTENDED' ? 'success' : 'warning',
-    });
+  const handleLog = async (
+    slotId: string,
+    subjectId: string,
+    componentType: any,
+    status: 'ATTENDED' | 'MISSED',
+    componentId?: string
+  ) => {
+    setSubmittingSlotId(slotId);
+    try {
+      await logAttendance(subjectId, componentType, status, todayStr, slotId, componentId);
+      showToast({
+        title: status === 'ATTENDED' ? 'Class Marked Attended' : 'Class Marked Missed',
+        message: `Updated attendance for ${subjects.find(s => s.id === subjectId)?.name || 'subject'}.`,
+        type: status === 'ATTENDED' ? 'success' : 'warning',
+      });
+    } catch (err: any) {
+      showToast({
+        title: 'Attendance Logging Failed',
+        message: err.message || 'Could not update attendance.',
+        type: 'danger',
+      });
+    } finally {
+      setSubmittingSlotId(null);
+    }
+  };
+
+  const handleRevert = async (logId: string, subjectName: string) => {
+    try {
+      await revertAttendanceLog(logId);
+      showToast({
+        title: 'Attendance Entry Reverted',
+        message: `Unmarked attendance entry for ${subjectName}.`,
+        type: 'info',
+      });
+    } catch (err: any) {
+      showToast({
+        title: 'Revert Failed',
+        message: err.message || 'Could not revert attendance entry.',
+        type: 'danger',
+      });
+    }
   };
 
   // Render first-use state if empty
@@ -123,11 +159,18 @@ export const Dashboard: React.FC = () => {
         title={settings.name || 'Dashboard'}
         description="Attendance decisions and semester metrics overview."
         actions={
-          <Link to="/app/setup">
-            <Button size="sm" className="flex items-center gap-1 cursor-pointer">
-              <Plus className="h-4 w-4" /> Setup Wizard
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/app/history">
+              <Button size="sm" variant="secondary" className="flex items-center gap-1 cursor-pointer">
+                <History className="h-4 w-4" /> Attendance History
+              </Button>
+            </Link>
+            <Link to="/app/setup">
+              <Button size="sm" className="flex items-center gap-1 cursor-pointer">
+                <Plus className="h-4 w-4" /> Setup Wizard
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -220,6 +263,12 @@ export const Dashboard: React.FC = () => {
               const subject = subjects.find((s) => s.id === slot.subjectId);
               if (!subject) return null;
 
+              // Find existing log for today for this slot or component
+              const existingLog = logs.find(
+                (l) => (l.slotId && l.slotId === slot.id) || (l.componentId && l.componentId === slot.componentId && l.date === todayStr)
+              );
+              const currentStatus = existingLog ? (existingLog.status === 'ATTENDED' ? 'ATTENDED' : 'MISSED') : null;
+
               // Calculate ifAttended and ifSkipped percentages in real-time
               const currentAttended = subject.totalAttended;
               const currentDelivered = subject.totalDelivered;
@@ -232,12 +281,18 @@ export const Dashboard: React.FC = () => {
                   subjectName={slot.subjectName}
                   subjectCode={slot.subjectCode}
                   componentType={slot.componentType}
+                  componentName={slot.componentName}
                   time={`${slot.startTime} - ${slot.endTime}`}
+                  room={slot.room}
                   currentPercentage={subject.currentPercentage}
                   ifAttendedPercentage={ifAttended}
                   ifSkippedPercentage={ifSkipped}
                   recommendation={subject.status}
-                  onLogAttendance={(status) => handleLog(slot.subjectId, slot.componentType, status)}
+                  currentStatus={currentStatus}
+                  isSubmitting={submittingSlotId === slot.id}
+                  onLogAttendance={(status) =>
+                    handleLog(slot.id, slot.subjectId, slot.componentType, status, slot.componentId)
+                  }
                 />
               );
             })}
@@ -253,7 +308,9 @@ export const Dashboard: React.FC = () => {
               <Clock className="h-4 w-4 text-text-secondary" />
               <h3 className="text-sm font-bold">Recent Attendance Updates</h3>
             </div>
-            <span className="text-[10px] text-text-muted font-mono">Real-time Local Logs</span>
+            <Link to="/app/history" className="text-[10px] text-brand hover:underline font-mono font-bold">
+              View Full History →
+            </Link>
           </div>
 
           <div className="divide-y divide-border/40 max-h-56 overflow-y-auto pr-1">
@@ -264,6 +321,7 @@ export const Dashboard: React.FC = () => {
                     className={cn(
                       'h-2 w-2 rounded-full',
                       log.status === 'ATTENDED' && 'bg-safe',
+                      log.status === 'MISSED' && 'bg-danger',
                       log.status === 'BUNKED' && 'bg-danger',
                       log.status === 'CANCELLED' && 'bg-text-muted'
                     )}
@@ -271,9 +329,10 @@ export const Dashboard: React.FC = () => {
                   <div>
                     <span className="font-semibold text-text-primary">{log.subjectName}</span>
                     <span className="text-text-muted ml-1 font-mono uppercase text-[9px] bg-surface-elevated border border-border px-1 py-0.5 rounded">
-                      {log.componentType}
+                      {log.componentName || log.componentType}
                     </span>
                     <span className="text-text-secondary ml-2 font-mono">{log.date}</span>
+                    {log.time && <span className="text-text-muted ml-2 font-mono text-[10px]">({log.time})</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -281,7 +340,7 @@ export const Dashboard: React.FC = () => {
                     className={cn(
                       'font-mono font-bold text-[10px] px-1.5 py-0.5 rounded uppercase border',
                       log.status === 'ATTENDED' && 'bg-safe-muted border-safe/25 text-safe',
-                      log.status === 'BUNKED' && 'bg-danger-muted border-danger/25 text-danger',
+                      (log.status === 'MISSED' || log.status === 'BUNKED') && 'bg-danger-muted border-danger/25 text-danger',
                       log.status === 'CANCELLED' && 'bg-surface-hover border-border text-text-muted'
                     )}
                   >
@@ -290,14 +349,7 @@ export const Dashboard: React.FC = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      revertAttendanceLog(log.id);
-                      showToast({
-                        title: 'Log Undone',
-                        message: `Reverted attendance entry for ${log.subjectName}.`,
-                        type: 'info',
-                      });
-                    }}
+                    onClick={() => handleRevert(log.id, log.subjectName)}
                     className="h-7 w-7 p-0 hover:bg-surface-elevated text-text-muted hover:text-text-primary rounded cursor-pointer"
                     title="Revert update"
                   >

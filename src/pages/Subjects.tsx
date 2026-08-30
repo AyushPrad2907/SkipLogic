@@ -7,13 +7,15 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { BookOpen, Plus } from 'lucide-react';
+import { AttendanceImporter } from '@/components/subjects/AttendanceImporter';
+import { BookOpen, Plus, FileSpreadsheet } from 'lucide-react';
 
 export const Subjects: React.FC = () => {
   const { subjects, addSubject, isLoading } = useAttendance();
   const { showToast } = useToast();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [subName, setSubName] = useState('');
   const [subCode, setSubCode] = useState('');
@@ -107,9 +109,19 @@ export const Subjects: React.FC = () => {
         title="Subjects"
         description="View tracked subjects, component breakdowns, and bunk caps."
         actions={
-          <Button size="sm" onClick={handleOpenAddModal} className="flex items-center gap-1 cursor-pointer">
-            <Plus className="h-4 w-4" /> Add Subject
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileSpreadsheet className="h-4 w-4 text-brand" /> Import Attendance (.xlsx)
+            </Button>
+            <Button size="sm" onClick={handleOpenAddModal} className="flex items-center gap-1 cursor-pointer">
+              <Plus className="h-4 w-4" /> Add Subject
+            </Button>
+          </div>
         }
       />
 
@@ -123,12 +135,17 @@ export const Subjects: React.FC = () => {
         <div className="py-12">
           <EmptyState
             title="No subjects yet"
-            description="Add your first subject to start tracking attendance."
+            description="Upload your current college attendance Excel file or add your first subject manually."
             icon={<BookOpen className="h-6 w-6 text-brand" />}
             action={
-              <Button onClick={handleOpenAddModal} className="flex items-center gap-1 cursor-pointer mx-auto">
-                <Plus className="h-4 w-4" /> Add Subject
-              </Button>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                <Button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 cursor-pointer">
+                  <FileSpreadsheet className="h-4 w-4" /> Import Attendance (.xlsx)
+                </Button>
+                <Button variant="secondary" onClick={handleOpenAddModal} className="flex items-center gap-1 cursor-pointer">
+                  <Plus className="h-4 w-4" /> Add Subject Manually
+                </Button>
+              </div>
             }
           />
         </div>
@@ -210,6 +227,13 @@ export const Subjects: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* IMPORT ATTENDANCE XLSX MODAL */}
+      <AttendanceImporter
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => setIsImportModalOpen(false)}
+      />
     </div>
   );
 };

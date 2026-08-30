@@ -5,7 +5,8 @@ import {
   SemesterSettings,
   AttendanceLog,
   SubjectComponentType,
-  AttendanceStatus
+  AttendanceStatus,
+  DayOfWeek
 } from '@/types';
 
 import {
@@ -18,6 +19,21 @@ import { supabase } from '@/lib/supabase';
 import { getActiveSemester } from '@/lib/semesters.functions';
 import { listSubjects, createSubject, updateSubject, deleteSubject } from '@/lib/subjects.functions';
 import { createComponent, updateComponent, deleteComponent } from '@/lib/components.functions';
+import {
+  listTimetableSlots,
+  createTimetableSlot,
+  updateTimetableSlot,
+  deleteTimetableSlot,
+  DayOfWeekEnum,
+  formatTimeHHMM
+} from '@/lib/timetable.functions';
+import {
+  listAttendanceLogs,
+  markAttendance as apiMarkAttendance,
+  updateAttendanceStatus as apiUpdateAttendanceStatus,
+  deleteAttendanceLog as apiDeleteAttendanceLog,
+  AttendanceStatusType,
+} from '@/lib/attendance.functions';
 
 // Default Fallback Settings
 const defaultSettings: SemesterSettings = {
@@ -44,15 +60,48 @@ interface AttendanceContextType {
   addComponent: (subjectId: string, type: string, name?: string, attended?: number, delivered?: number) => Promise<void>;
   updateComponent: (componentId: string, subjectId: string, updates: { type?: string; name?: string; attended?: number; delivered?: number }) => Promise<void>;
   deleteComponent: (componentId: string, subjectId: string) => Promise<void>;
-  addTimetableSlot: (slot: Omit<TimetableSlot, 'id'>) => void;
-  deleteTimetableSlot: (id: string) => void;
+  addTimetableSlot: (input: {
+    subjectId: string;
+    componentId: string;
+    day: DayOfWeek;
+    startTime: string;
+    endTime: string;
+    room?: string;
+    instructor?: string;
+    slotOrder?: number;
+  }) => Promise<void>;
+  updateTimetableSlot: (
+    slotId: string,
+    updates: {
+      subjectId?: string;
+      componentId?: string;
+      day?: DayOfWeek;
+      startTime?: string;
+      endTime?: string;
+      room?: string;
+      instructor?: string;
+      slotOrder?: number;
+    }
+  ) => Promise<void>;
+  deleteTimetableSlot: (id: string) => Promise<void>;
   logAttendance: (
     subjectId: string,
     componentType: SubjectComponentType,
-    status: 'ATTENDED' | 'BUNKED' | 'CANCELLED',
-    date: string
-  ) => void;
-  revertAttendanceLog: (logId: string) => void;
+    status: 'ATTENDED' | 'MISSED' | 'BUNKED' | 'CANCELLED',
+    date: string,
+    slotId?: string | null,
+    componentId?: string
+  ) => Promise<void>;
+  markAttendance: (input: {
+    semesterId?: string;
+    subjectId: string;
+    componentId: string;
+    date: string;
+    status: 'ATTENDED' | 'MISSED';
+    slotId?: string | null;
+  }) => Promise<void>;
+  updateAttendanceStatus: (logId: string, newStatus: 'ATTENDED' | 'MISSED') => Promise<void>;
+  revertAttendanceLog: (logId: string) => Promise<void>;
   updateSettings: (settings: SemesterSettings) => void;
   loadMockData: () => void;
   resetAllData: () => void;
@@ -95,36 +144,11 @@ export function calculateSubjectStats(
 
 export function AttendanceProvider({ children }: { children: React.ReactNode }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [timetable, setTimetable] = useState<TimetableSlot[]>([]);
   const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null);
   const [settings, setSettings] = useState<SemesterSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-
-  const [timetable, setTimetable] = useState<TimetableSlot[]>(() => {
-    try {
-      const saved = localStorage.getItem('skiplogic-timetable');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [logs, setLogs] = useState<AttendanceLog[]>(() => {
-    try {
-      const saved = localStorage.getItem('skiplogic-logs');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // Save timetable & logs to localStorage as fallback
-  useEffect(() => {
-    localStorage.setItem('skiplogic-timetable', JSON.stringify(timetable));
-  }, [timetable]);
-
-  useEffect(() => {
-    localStorage.setItem('skiplogic-logs', JSON.stringify(logs));
-  }, [logs]);
+  const [logs, setLogs] = useState<AttendanceLog[]>([]);
 
   // Main data sync function with Supabase
   const refreshData = useCallback(async () => {
@@ -132,9 +156,6 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        // Unauthenticated fallback to localStorage if available
-        const saved = localStorage.getItem('skiplogic-subjects');
-        setSubjects(saved ? JSON.parse(saved) : []);
         setIsLoading(false);
         return;
       }
@@ -153,8 +174,8 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
       };
       setSettings(semSettings);
 
+      // Fetch subjects & components
       const rawSubjects = await listSubjects(activeSem.id);
-
       const formattedSubjects: Subject[] = rawSubjects.map((sub) => {
         const comps = (sub.components || []).map((c) => ({
           id: c.id,
@@ -180,6 +201,57 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
       });
 
       setSubjects(formattedSubjects);
+
+      // Fetch timetable slots
+      const rawSlots = await listTimetableSlots(activeSem.id);
+      const formattedSlots: TimetableSlot[] = rawSlots.map((slot) => {
+        const sub = formattedSubjects.find((s) => s.id === slot.subject_id);
+        const comp = sub?.components?.find((c) => c.id === slot.component_id);
+
+        return {
+          id: slot.id,
+          subjectId: slot.subject_id,
+          componentId: slot.component_id || undefined,
+          subjectName: slot.subjects?.name || sub?.name || 'Unknown Subject',
+          subjectCode: slot.subjects?.code || sub?.code || undefined,
+          componentType: (slot.components?.type || comp?.type || 'LECTURE') as any,
+          componentName: slot.components?.name || comp?.name || undefined,
+          day: slot.day_of_week as DayOfWeek,
+          startTime: formatTimeHHMM(slot.start_time),
+          endTime: formatTimeHHMM(slot.end_time),
+          room: slot.room || undefined,
+          instructor: slot.faculty || undefined,
+          slotOrder: slot.slot_order || undefined,
+        };
+      });
+
+      setTimetable(formattedSlots);
+
+      // Fetch real attendance logs from Supabase
+      const rawLogs = await listAttendanceLogs(activeSem.id);
+      const formattedLogs: AttendanceLog[] = rawLogs.map((log) => {
+        const sub = formattedSubjects.find((s) => s.id === log.subject_id);
+        const comp = sub?.components?.find((c) => c.id === log.component_id);
+        const slot = rawSlots.find((s) => s.id === log.slot_id);
+
+        return {
+          id: log.id,
+          semesterId: log.semester_id,
+          subjectId: log.subject_id,
+          componentId: log.component_id,
+          slotId: log.slot_id,
+          subjectName: log.subjects?.name || sub?.name || 'Unknown Subject',
+          componentType: (log.components?.type || comp?.type || 'LECTURE') as any,
+          componentName: log.components?.name || comp?.name || undefined,
+          status: (log.status === 'ATTENDED' ? 'ATTENDED' : 'MISSED') as any,
+          date: log.date,
+          timestamp: log.created_at,
+          time: slot ? `${formatTimeHHMM(slot.start_time)} - ${formatTimeHHMM(slot.end_time)}` : log.timetable_slots ? `${formatTimeHHMM(log.timetable_slots.start_time)} - ${formatTimeHHMM(log.timetable_slots.end_time)}` : undefined,
+          room: slot?.room || log.timetable_slots?.room || undefined,
+        };
+      });
+
+      setLogs(formattedLogs);
     } catch (err) {
       console.warn('AttendanceProvider sync warning:', err);
     } finally {
@@ -190,7 +262,6 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     refreshData();
 
-    // Listen to Auth state changes to re-sync
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       refreshData();
     });
@@ -200,7 +271,7 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
     };
   }, [refreshData]);
 
-  // Methods
+  // Subject methods
   const handleAddSubject = useCallback(async (subjectData: { name: string; code?: string; color?: string; targetThreshold?: number }) => {
     let targetSemId = activeSemesterId;
     if (!targetSemId) {
@@ -233,12 +304,10 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
     if (activeSemesterId) {
       await deleteSubject(id);
     }
-    setSubjects((prev) => prev.filter((sub) => sub.id !== id));
-    setTimetable((prev) => prev.filter((slot) => slot.subjectId !== id));
-    setLogs((prev) => prev.filter((log) => log.subjectId !== id));
     await refreshData();
   }, [activeSemesterId, refreshData]);
 
+  // Component methods
   const handleAddComponent = useCallback(async (
     subjectId: string,
     type: string,
@@ -275,61 +344,145 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
     await refreshData();
   }, [refreshData]);
 
-  const addTimetableSlot = useCallback((slotData: Omit<TimetableSlot, 'id'>) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setTimetable((prev) => [...prev, { ...slotData, id }]);
-  }, []);
+  // Timetable methods
+  const handleAddTimetableSlot = useCallback(async (input: {
+    subjectId: string;
+    componentId: string;
+    day: DayOfWeek;
+    startTime: string;
+    endTime: string;
+    room?: string;
+    instructor?: string;
+    slotOrder?: number;
+  }) => {
+    let targetSemId = activeSemesterId;
+    if (!targetSemId) {
+      const activeSem = await getActiveSemester();
+      targetSemId = activeSem.id;
+      setActiveSemesterId(activeSem.id);
+    }
 
-  const deleteTimetableSlot = useCallback((id: string) => {
-    setTimetable((prev) => prev.filter((slot) => slot.id !== id));
-  }, []);
+    await createTimetableSlot({
+      semesterId: targetSemId,
+      subjectId: input.subjectId,
+      componentId: input.componentId,
+      dayOfWeek: input.day as DayOfWeekEnum,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      room: input.room,
+      faculty: input.instructor,
+      slotOrder: input.slotOrder,
+    });
 
-  const logAttendance = useCallback((
+    await refreshData();
+  }, [activeSemesterId, refreshData]);
+
+  const handleUpdateTimetableSlot = useCallback(async (
+    slotId: string,
+    updates: {
+      subjectId?: string;
+      componentId?: string;
+      day?: DayOfWeek;
+      startTime?: string;
+      endTime?: string;
+      room?: string;
+      instructor?: string;
+      slotOrder?: number;
+    }
+  ) => {
+    await updateTimetableSlot(slotId, {
+      subjectId: updates.subjectId,
+      componentId: updates.componentId,
+      dayOfWeek: updates.day as DayOfWeekEnum,
+      startTime: updates.startTime,
+      endTime: updates.endTime,
+      room: updates.room,
+      faculty: updates.instructor,
+      slotOrder: updates.slotOrder,
+    });
+
+    await refreshData();
+  }, [refreshData]);
+
+  const handleDeleteTimetableSlot = useCallback(async (slotId: string) => {
+    await deleteTimetableSlot(slotId);
+    await refreshData();
+  }, [refreshData]);
+
+  // Attendance marking methods
+  const handleMarkAttendance = useCallback(async (input: {
+    semesterId?: string;
+    subjectId: string;
+    componentId: string;
+    date: string;
+    status: 'ATTENDED' | 'MISSED';
+    slotId?: string | null;
+  }) => {
+    let targetSemId = input.semesterId || activeSemesterId;
+    if (!targetSemId) {
+      const activeSem = await getActiveSemester();
+      targetSemId = activeSem.id;
+      setActiveSemesterId(activeSem.id);
+    }
+
+    await apiMarkAttendance({
+      semesterId: targetSemId,
+      subjectId: input.subjectId,
+      componentId: input.componentId,
+      date: input.date,
+      status: input.status,
+      slotId: input.slotId,
+    });
+
+    await refreshData();
+  }, [activeSemesterId, refreshData]);
+
+  const handleLogAttendance = useCallback(async (
     subjectId: string,
     componentType: SubjectComponentType,
-    status: 'ATTENDED' | 'BUNKED' | 'CANCELLED',
-    date: string
+    status: 'ATTENDED' | 'MISSED' | 'BUNKED' | 'CANCELLED',
+    date: string,
+    slotId?: string | null,
+    componentId?: string
   ) => {
     const subject = subjects.find((s) => s.id === subjectId);
     if (!subject) return;
 
-    const newLog: AttendanceLog = {
-      id: Math.random().toString(36).substring(2, 9),
-      subjectId,
-      subjectName: subject.name,
-      componentType,
-      status,
-      date,
-      timestamp: new Date().toISOString(),
-    };
+    const targetComp = componentId
+      ? subject.components?.find((c) => c.id === componentId)
+      : subject.components?.find((c) => c.type === componentType) || subject.components?.[0];
 
-    setLogs((prev) => [newLog, ...prev]);
-
-    // Update state locally & push component update to DB if component exists
-    if (status !== 'CANCELLED' && subject.components && subject.components.length > 0) {
-      const targetComp = subject.components.find((c) => c.type === componentType) || subject.components[0];
-      if (targetComp) {
-        const nextAttended = targetComp.totalAttended + (status === 'ATTENDED' ? 1 : 0);
-        const nextDelivered = targetComp.totalDelivered + 1;
-        updateComponent(targetComp.id, {
-          attended: nextAttended,
-          delivered: nextDelivered,
-        }).then(() => refreshData());
-      }
+    if (!targetComp) {
+      throw new Error('No valid component found for attendance entry.');
     }
-  }, [subjects, refreshData]);
 
-  const revertAttendanceLog = useCallback((logId: string) => {
-    setLogs((prev) => prev.filter((l) => l.id !== logId));
-  }, []);
+    const actualStatus: AttendanceStatusType = status === 'ATTENDED' ? 'ATTENDED' : 'MISSED';
+
+    await handleMarkAttendance({
+      semesterId: activeSemesterId || undefined,
+      subjectId,
+      componentId: targetComp.id,
+      date,
+      status: actualStatus,
+      slotId: slotId || null,
+    });
+  }, [subjects, activeSemesterId, handleMarkAttendance]);
+
+  const handleUpdateAttendanceStatus = useCallback(async (logId: string, newStatus: 'ATTENDED' | 'MISSED') => {
+    await apiUpdateAttendanceStatus(logId, newStatus);
+    await refreshData();
+  }, [refreshData]);
+
+  const revertAttendanceLog = useCallback(async (logId: string) => {
+    await apiDeleteAttendanceLog(logId);
+    await refreshData();
+  }, [refreshData]);
 
   const updateSettings = useCallback((newSettings: SemesterSettings) => {
     setSettings(newSettings);
   }, []);
 
-  const loadMockData = useCallback(() => {
-    // Legacy mock loader
-  }, []);
+  const loadMockData = useCallback(() => {}, []);
 
   const resetAllData = useCallback(() => {
     setSubjects([]);
@@ -352,9 +505,12 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
         addComponent: handleAddComponent,
         updateComponent: handleUpdateComponent,
         deleteComponent: handleDeleteComponent,
-        addTimetableSlot,
-        deleteTimetableSlot,
-        logAttendance,
+        addTimetableSlot: handleAddTimetableSlot,
+        updateTimetableSlot: handleUpdateTimetableSlot,
+        deleteTimetableSlot: handleDeleteTimetableSlot,
+        logAttendance: handleLogAttendance,
+        markAttendance: handleMarkAttendance,
+        updateAttendanceStatus: handleUpdateAttendanceStatus,
         revertAttendanceLog,
         updateSettings,
         loadMockData,

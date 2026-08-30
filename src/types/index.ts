@@ -32,14 +32,17 @@ export type DayOfWeek = 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDA
 export interface TimetableSlot {
   id: string;
   subjectId: string;
+  componentId?: string;
   subjectName: string;
   subjectCode?: string;
   componentType: SubjectComponentType;
+  componentName?: string;
   day: DayOfWeek;
   startTime: string; // "09:00"
   endTime: string;   // "10:00"
   room?: string;
   instructor?: string;
+  slotOrder?: number;
 }
 
 export interface SemesterSettings {
@@ -66,11 +69,17 @@ export interface AttendanceDecision {
 
 export interface AttendanceLog {
   id: string;
+  semesterId?: string;
   subjectId: string;
+  componentId?: string;
+  slotId?: string | null;
   subjectName: string;
   componentType: SubjectComponentType;
-  status: 'ATTENDED' | 'BUNKED' | 'CANCELLED';
+  componentName?: string;
+  status: 'ATTENDED' | 'MISSED' | 'BUNKED' | 'CANCELLED';
   date: string; // ISO date string (YYYY-MM-DD)
   timestamp: string; // full ISO string
+  time?: string;
+  room?: string;
 }
 

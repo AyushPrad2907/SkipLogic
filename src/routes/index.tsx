@@ -9,6 +9,7 @@ import { Subjects } from '@/pages/Subjects';
 import { SubjectDetail } from '@/pages/SubjectDetail';
 import { Timetable } from '@/pages/Timetable';
 import { Semester } from '@/pages/Semester';
+import { AttendanceHistory } from '@/pages/AttendanceHistory';
 
 export const router = createBrowserRouter([
   // Marketing / Public Routes
@@ -50,6 +51,10 @@ export const router = createBrowserRouter([
       {
         path: 'timetable',
         element: <Timetable />,
+      },
+      {
+        path: 'history',
+        element: <AttendanceHistory />,
       },
       {
         path: 'semester',

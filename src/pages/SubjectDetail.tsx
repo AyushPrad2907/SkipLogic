@@ -570,12 +570,14 @@ export const SubjectDetail: React.FC = () => {
                     className={cn(
                       'h-2 w-2 rounded-full',
                       log.status === 'ATTENDED' && 'bg-safe',
-                      log.status === 'BUNKED' && 'bg-danger',
+                      (log.status === 'MISSED' || log.status === 'BUNKED') && 'bg-danger',
                       log.status === 'CANCELLED' && 'bg-text-muted'
                     )}
                   />
                   <div>
-                    <span className="font-semibold text-text-primary uppercase tracking-wide font-mono text-[10px] bg-surface-elevated border px-1 rounded mr-1">{log.componentType}</span>
+                    <span className="font-semibold text-text-primary uppercase tracking-wide font-mono text-[10px] bg-surface-elevated border px-1 rounded mr-1">
+                      {log.componentName || log.componentType}
+                    </span>
                     <span className="text-text-muted">{log.date}</span>
                   </div>
                 </div>
@@ -584,7 +586,7 @@ export const SubjectDetail: React.FC = () => {
                     className={cn(
                       'font-mono text-[10px] font-bold border rounded px-1.5 uppercase',
                       log.status === 'ATTENDED' && 'bg-safe-muted border-safe/25 text-safe',
-                      log.status === 'BUNKED' && 'bg-danger-muted border-danger/25 text-danger',
+                      (log.status === 'MISSED' || log.status === 'BUNKED') && 'bg-danger-muted border-danger/25 text-danger',
                       log.status === 'CANCELLED' && 'bg-surface-hover border-border text-text-muted'
                     )}
                   >
@@ -593,9 +595,9 @@ export const SubjectDetail: React.FC = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      revertAttendanceLog(log.id);
-                      showToast({ title: 'Reverted Entry', message: 'Log has been deleted.', type: 'info' });
+                    onClick={async () => {
+                      await revertAttendanceLog(log.id);
+                      showToast({ title: 'Reverted Entry', message: 'Log entry deleted and counters updated.', type: 'info' });
                     }}
                     className="h-7 w-7 p-0 hover:bg-surface-elevated text-text-muted hover:text-text-primary rounded cursor-pointer"
                   >
