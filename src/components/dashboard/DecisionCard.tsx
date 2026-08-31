@@ -13,10 +13,12 @@ interface DecisionCardProps {
   componentName?: string;
   time: string;
   room?: string;
-  currentPercentage: number;
+  currentPercentage: number | null;
   ifAttendedPercentage: number;
   ifSkippedPercentage: number;
   recommendation: AttendanceStatus;
+  explanation?: string;
+  isMostImportant?: boolean;
   currentStatus?: 'ATTENDED' | 'MISSED' | null;
   onLogAttendance?: (status: 'ATTENDED' | 'MISSED') => void;
   isSubmitting?: boolean;
@@ -33,6 +35,8 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
   ifAttendedPercentage,
   ifSkippedPercentage,
   recommendation,
+  explanation,
+  isMostImportant = false,
   currentStatus,
   onLogAttendance,
   isSubmitting = false,
@@ -40,14 +44,25 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
   return (
     <Card
       className={cn(
-        'border relative flex flex-col justify-between overflow-hidden transition-colors',
-        recommendation === 'SAFE' && 'border-safe/20',
-        recommendation === 'RISKY' && 'border-risk/20',
-        recommendation === 'MUST_ATTEND' && 'border-danger/20'
+        'border relative flex flex-col justify-between overflow-hidden transition-all',
+        isMostImportant
+          ? 'border-brand shadow-[0_0_12px_rgba(var(--brand-rgb),0.25)] ring-1 ring-brand/40'
+          : recommendation === 'SAFE'
+          ? 'border-safe/20'
+          : recommendation === 'RISKY'
+          ? 'border-risk/20'
+          : 'border-danger/20'
       )}
     >
       {/* Header Info */}
       <div>
+        {isMostImportant && (
+          <div className="bg-brand/10 border-b border-brand/20 px-3 py-1 -mx-4 -mt-4 mb-3 flex items-center justify-between text-[10px] font-mono font-bold text-brand uppercase tracking-wider">
+            <span>★ MOST IMPORTANT TODAY</span>
+            <span>CRITICAL</span>
+          </div>
+        )}
+
         <div className="flex items-start justify-between gap-2">
           <div>
             <h4 className="font-bold text-text-primary text-sm line-clamp-1">{subjectName}</h4>
@@ -72,7 +87,7 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
         <div className="mt-3 flex items-center justify-between">
           <span className="text-xs text-text-secondary">Current Attendance:</span>
           <span className="font-mono font-bold text-sm text-text-primary">
-            {currentPercentage.toFixed(1)}%
+            {currentPercentage !== null ? `${currentPercentage.toFixed(1)}%` : '—'}
           </span>
         </div>
 
@@ -96,6 +111,13 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
             </span>
           </div>
         </div>
+
+        {/* Decision Explanation Text */}
+        {explanation && (
+          <p className="mt-2 text-[11px] text-text-muted italic leading-tight font-sans">
+            "{explanation}"
+          </p>
+        )}
       </div>
 
       {/* Decision recommendation tag & logger controls */}

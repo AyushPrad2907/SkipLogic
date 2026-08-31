@@ -6,7 +6,8 @@ import {
   AttendanceLog,
   SubjectComponentType,
   AttendanceStatus,
-  DayOfWeek
+  DayOfWeek,
+  HolidayItem,
 } from '@/types';
 
 import {
@@ -17,7 +18,20 @@ import {
   predictSubject as enginePredictSubject,
 } from '@/lib/engine';
 import { supabase } from '@/lib/supabase';
-import { getActiveSemester } from '@/lib/semesters.functions';
+import {
+  getActiveSemester,
+  listSemesters,
+  createSemester as apiCreateSemester,
+  updateSemester as apiUpdateSemester,
+  setActiveSemester as apiSetActiveSemester,
+  deleteSemester as apiDeleteSemester,
+  listHolidays,
+  createHoliday,
+  updateHoliday,
+  deleteHoliday,
+  SemesterRow,
+  HolidayRow,
+} from '@/lib/semesters.functions';
 import { listSubjects, createSubject, updateSubject, deleteSubject } from '@/lib/subjects.functions';
 import { createComponent, updateComponent, deleteComponent } from '@/lib/components.functions';
 import {
@@ -45,6 +59,7 @@ const defaultSettings: SemesterSettings = {
   targetThreshold: 75,
   workingDays: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
   holidays: [],
+  holidayObjects: [],
 };
 
 // Interface for the context value
@@ -52,15 +67,32 @@ interface AttendanceContextType {
   subjects: Subject[];
   timetable: TimetableSlot[];
   settings: SemesterSettings;
+  semesters: SemesterRow[];
+  holidays: HolidayRow[];
   logs: AttendanceLog[];
   activeSemesterId: string | null;
   isLoading: boolean;
+
+  // Semester methods
+  switchSemester: (semesterId: string) => Promise<void>;
+  createSemester: (input: { name: string; startDate: string; endDate: string; threshold?: number; workingDays?: string[] }) => Promise<SemesterRow>;
+  updateSemesterSettings: (semesterId: string, updates: Partial<SemesterSettings>) => Promise<void>;
+  deleteSemester: (semesterId: string) => Promise<void>;
+
+  // Holiday methods
+  addHoliday: (date: string, name?: string) => Promise<void>;
+  editHoliday: (id: string, date: string, name?: string) => Promise<void>;
+  removeHoliday: (id: string) => Promise<void>;
+
+  // Subject methods
   addSubject: (subject: { name: string; code?: string; color?: string; targetThreshold?: number }) => Promise<void>;
   updateSubject: (id: string, updates: Partial<Subject>) => Promise<void>;
   deleteSubject: (id: string) => Promise<void>;
   addComponent: (subjectId: string, type: string, name?: string, attended?: number, delivered?: number) => Promise<void>;
   updateComponent: (componentId: string, subjectId: string, updates: { type?: string; name?: string; attended?: number; delivered?: number }) => Promise<void>;
   deleteComponent: (componentId: string, subjectId: string) => Promise<void>;
+
+  // Timetable methods
   addTimetableSlot: (input: {
     subjectId: string;
     componentId: string;
@@ -85,6 +117,8 @@ interface AttendanceContextType {
     }
   ) => Promise<void>;
   deleteTimetableSlot: (id: string) => Promise<void>;
+
+  // Attendance logging methods
   logAttendance: (
     subjectId: string,
     componentType: SubjectComponentType,
@@ -148,6 +182,8 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [timetable, setTimetable] = useState<TimetableSlot[]>([]);
   const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null);
+  const [semesters, setSemesters] = useState<SemesterRow[]>([]);
+  const [holidays, setHolidays] = useState<HolidayRow[]>([]);
   const [settings, setSettings] = useState<SemesterSettings>(defaultSettings);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [logs, setLogs] = useState<AttendanceLog[]>([]);
@@ -162,8 +198,24 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
         return;
       }
 
+      // Fetch user semesters
+      const allSemesters = await listSemesters();
+      setSemesters(allSemesters);
+
       const activeSem = await getActiveSemester();
       setActiveSemesterId(activeSem.id);
+
+      // Fetch real holidays for active semester
+      const rawHolidays = await listHolidays(activeSem.id);
+      setHolidays(rawHolidays);
+
+      const holidayDates = rawHolidays.map((h) => h.date);
+      const holidayObjects: HolidayItem[] = rawHolidays.map((h) => ({
+        id: h.id,
+        semesterId: h.semester_id,
+        date: h.date,
+        name: h.name,
+      }));
 
       const semSettings: SemesterSettings = {
         id: activeSem.id,
@@ -172,7 +224,8 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
         endDate: activeSem.end_date,
         targetThreshold: Number(activeSem.threshold) || 75,
         workingDays: (activeSem.working_days as any) || ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
-        holidays: [],
+        holidays: holidayDates,
+        holidayObjects,
       };
       setSettings(semSettings);
 
@@ -271,6 +324,64 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
     return () => {
       subscription.unsubscribe();
     };
+  }, [refreshData]);
+
+  // Semester Management Methods
+  const handleSwitchSemester = useCallback(async (semesterId: string) => {
+    await apiSetActiveSemester(semesterId);
+    await refreshData();
+  }, [refreshData]);
+
+  const handleCreateSemester = useCallback(async (input: {
+    name: string;
+    startDate: string;
+    endDate: string;
+    threshold?: number;
+    workingDays?: string[];
+  }) => {
+    const created = await apiCreateSemester({ ...input, isActive: true });
+    await refreshData();
+    return created;
+  }, [refreshData]);
+
+  const handleUpdateSemesterSettings = useCallback(async (
+    semesterId: string,
+    updates: Partial<SemesterSettings>
+  ) => {
+    await apiUpdateSemester(semesterId, {
+      name: updates.name,
+      startDate: updates.startDate,
+      endDate: updates.endDate,
+      threshold: updates.targetThreshold,
+      workingDays: updates.workingDays,
+    });
+    await refreshData();
+  }, [refreshData]);
+
+  const handleDeleteSemester = useCallback(async (semesterId: string) => {
+    await apiDeleteSemester(semesterId);
+    await refreshData();
+  }, [refreshData]);
+
+  // Holiday Management Methods
+  const handleAddHoliday = useCallback(async (date: string, name?: string) => {
+    if (!activeSemesterId) {
+      const activeSem = await getActiveSemester();
+      setActiveSemesterId(activeSem.id);
+    }
+    const targetSemId = activeSemesterId!;
+    await createHoliday({ semesterId: targetSemId, date, name });
+    await refreshData();
+  }, [activeSemesterId, refreshData]);
+
+  const handleEditHoliday = useCallback(async (id: string, date: string, name?: string) => {
+    await updateHoliday(id, { date, name });
+    await refreshData();
+  }, [refreshData]);
+
+  const handleRemoveHoliday = useCallback(async (id: string) => {
+    await deleteHoliday(id);
+    await refreshData();
   }, [refreshData]);
 
   // Subject methods
@@ -539,9 +650,18 @@ export function AttendanceProvider({ children }: { children: React.ReactNode }) 
         subjects,
         timetable,
         settings,
+        semesters,
+        holidays,
         logs,
         activeSemesterId,
         isLoading,
+        switchSemester: handleSwitchSemester,
+        createSemester: handleCreateSemester,
+        updateSemesterSettings: handleUpdateSemesterSettings,
+        deleteSemester: handleDeleteSemester,
+        addHoliday: handleAddHoliday,
+        editHoliday: handleEditHoliday,
+        removeHoliday: handleRemoveHoliday,
         addSubject: handleAddSubject,
         updateSubject: handleUpdateSubject,
         deleteSubject: handleDeleteSubject,

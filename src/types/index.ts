@@ -45,6 +45,13 @@ export interface TimetableSlot {
   slotOrder?: number;
 }
 
+export interface HolidayItem {
+  id: string;
+  semesterId: string;
+  date: string;
+  name?: string | null;
+}
+
 export interface SemesterSettings {
   id: string;
   name: string;
@@ -53,6 +60,7 @@ export interface SemesterSettings {
   targetThreshold: number; // Default 75%
   workingDays: DayOfWeek[];
   holidays: string[]; // ISO date strings
+  holidayObjects?: HolidayItem[];
 }
 
 export interface AttendanceDecision {
@@ -82,4 +90,3 @@ export interface AttendanceLog {
   time?: string;
   room?: string;
 }
-

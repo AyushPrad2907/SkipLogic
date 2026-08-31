@@ -1,46 +1,56 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useDashboardData } from '@/hooks/useDashboardData';
 import { useAttendance } from '@/providers/AttendanceProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { StatCard } from '@/components/ui/StatCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { RingProgress } from '@/components/ui/RingProgress';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { DecisionCard } from '@/components/dashboard/DecisionCard';
+import { OverallCommandCenter } from '@/components/dashboard/OverallCommandCenter';
+import { SubjectRiskOverview } from '@/components/dashboard/SubjectRiskOverview';
+import { RecoveryAlertsCard } from '@/components/dashboard/RecoveryAlertsCard';
+import { SafeBunkPlanCard } from '@/components/dashboard/SafeBunkPlanCard';
+import { SemesterForecastCard } from '@/components/dashboard/SemesterForecastCard';
+import { WhatIfSimulatorCard } from '@/components/dashboard/WhatIfSimulatorCard';
+import { TimetableImporter } from '@/components/timetable/TimetableImporter';
+import { AttendanceImporter } from '@/components/subjects/AttendanceImporter';
 import { cn } from '@/lib/utils';
 import {
-  Calendar,
-  AlertCircle,
   Plus,
   Play,
-  RotateCcw,
-  CheckCircle,
   Clock,
-  History
+  History,
+  Upload,
+  FileSpreadsheet,
+  AlertCircle,
+  RefreshCw,
+  BookOpen,
+  RotateCcw,
 } from 'lucide-react';
 import { DayOfWeek } from '@/types';
-import { pct, calculateClassSkipImpact } from '@/lib/engine';
 
 export const Dashboard: React.FC = () => {
+  const { logs } = useAttendance();
   const {
-    subjects,
-    timetable,
-    logs,
+    viewModel,
+    selectedDay,
+    setSelectedDay,
+    isLoading,
+    isError,
+    error,
+    refetch,
     logAttendance,
     revertAttendanceLog,
     loadMockData,
-    settings,
-  } = useAttendance();
+  } = useDashboardData();
   const { showToast } = useToast();
 
-  const days: DayOfWeek[] = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-  const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => {
-    const todayIndex = new Date().getDay();
-    return days[todayIndex] === 'SUNDAY' || days[todayIndex] === 'SATURDAY' ? 'MONDAY' : days[todayIndex];
-  });
   const [submittingSlotId, setSubmittingSlotId] = useState<string | null>(null);
+  const [isTimetableImporterOpen, setIsTimetableImporterOpen] = useState(false);
+  const [isAttendanceImporterOpen, setIsAttendanceImporterOpen] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -52,26 +62,6 @@ export const Dashboard: React.FC = () => {
       type: 'success',
     });
   };
-
-  // Stats Calculations
-  const totalDelivered = subjects.reduce((acc, s) => acc + s.totalDelivered, 0);
-  const totalAttended = subjects.reduce((acc, s) => acc + s.totalAttended, 0);
-  const overallPercentage = pct(totalAttended, totalDelivered) ?? 100;
-
-  const safeSubjects = subjects.filter((s) => s.status === 'SAFE').length;
-  const dangerSubjects = subjects.filter((s) => s.status === 'MUST_ATTEND').length;
-
-  const getOverallStatus = () => {
-    if (overallPercentage > settings.targetThreshold + 5) return 'SAFE';
-    if (overallPercentage > settings.targetThreshold) return 'RISKY';
-    return 'MUST_ATTEND';
-  };
-
-  // Filter slots for the selected day
-  const dailySlots = timetable.filter((slot) => slot.day === selectedDay);
-
-  // Sort slots by start time
-  const sortedSlots = [...dailySlots].sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   const handleLog = async (
     slotId: string,
@@ -85,7 +75,7 @@ export const Dashboard: React.FC = () => {
       await logAttendance(subjectId, componentType, status, todayStr, slotId, componentId);
       showToast({
         title: status === 'ATTENDED' ? 'Class Marked Attended' : 'Class Marked Missed',
-        message: `Updated attendance for ${subjects.find(s => s.id === subjectId)?.name || 'subject'}.`,
+        message: 'Updated attendance in real-time.',
         type: status === 'ATTENDED' ? 'success' : 'warning',
       });
     } catch (err: any) {
@@ -116,8 +106,38 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  // Render first-use state if empty
-  if (subjects.length === 0) {
+  // 1. Loading State
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Dashboard" description="Loading attendance intelligence command center..." />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton className="h-40 col-span-3 rounded-xl" />
+          <Skeleton className="h-48 col-span-2 rounded-xl" />
+          <Skeleton className="h-48 col-span-1 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Recoverable Error State
+  if (isError) {
+    return (
+      <div className="py-12 text-center space-y-4">
+        <AlertCircle className="h-10 w-10 text-danger mx-auto" />
+        <h3 className="text-lg font-bold text-text-primary">Unable to load attendance data</h3>
+        <p className="text-xs text-text-secondary max-w-sm mx-auto">
+          {error?.message || 'A network error occurred while aggregating dashboard telemetry.'}
+        </p>
+        <Button onClick={refetch} variant="secondary" className="flex items-center gap-1.5 mx-auto cursor-pointer">
+          <RefreshCw className="h-4 w-4" /> Retry
+        </Button>
+      </div>
+    );
+  }
+
+  // 3. Structured Empty States
+  if (!viewModel.hasSubjects) {
     return (
       <div>
         <PageHeader
@@ -125,110 +145,106 @@ export const Dashboard: React.FC = () => {
           description="Tactical attendance decision dashboard."
           actions={
             <Button onClick={handleLoadMock} variant="secondary" className="flex items-center gap-1 cursor-pointer">
-              <Play className="h-4 w-4" /> Load Mock Data
+              <Play className="h-4 w-4" /> Load Mock Demo Data
             </Button>
           }
         />
-        
         <div className="py-12">
           <EmptyState
-            title="Your attendance engine is ready"
-            description="Set up your semester timetable to start calculating buffers and recovery consecutive classes."
-            icon={<Calendar className="h-6 w-6 text-brand" />}
+            title="Add your subjects to start"
+            description="Create your subjects or import your timetable to start calculating buffers, threshold safety margins, and recovery plans."
+            icon={<BookOpen className="h-6 w-6 text-brand" />}
             action={
               <div className="flex flex-col sm:flex-row gap-3 justify-center w-full">
                 <Link to="/app/setup">
                   <Button className="w-full sm:w-auto flex items-center gap-1.5 cursor-pointer">
-                    <Plus className="h-4 w-4" /> Import Timetable
+                    <Plus className="h-4 w-4" /> Setup Semester & Subjects
                   </Button>
                 </Link>
-                <Button onClick={handleLoadMock} variant="secondary" className="w-full sm:w-auto cursor-pointer">
-                  See Demo Version
+                <Button
+                  onClick={() => setIsTimetableImporterOpen(true)}
+                  variant="secondary"
+                  className="w-full sm:w-auto flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-brand" /> Import XLSX Timetable
                 </Button>
               </div>
             }
           />
         </div>
+
+        <TimetableImporter
+          isOpen={isTimetableImporterOpen}
+          onClose={() => setIsTimetableImporterOpen(false)}
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Page Header & Quick Action Bar */}
       <PageHeader
-        title={settings.name || 'Dashboard'}
-        description="Attendance decisions and semester metrics overview."
+        title="Dashboard"
+        description="Attendance command center & tactical decision intelligence."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setIsTimetableImporterOpen(true)}
+              className="flex items-center gap-1 cursor-pointer"
+            >
+              <Upload className="h-3.5 w-3.5" /> Import Timetable
+            </Button>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setIsAttendanceImporterOpen(true)}
+              className="flex items-center gap-1 cursor-pointer"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 text-brand" /> Import Attendance
+            </Button>
+
             <Link to="/app/history">
               <Button size="sm" variant="secondary" className="flex items-center gap-1 cursor-pointer">
-                <History className="h-4 w-4" /> Attendance History
+                <History className="h-3.5 w-3.5" /> History
               </Button>
             </Link>
+
             <Link to="/app/setup">
               <Button size="sm" className="flex items-center gap-1 cursor-pointer">
-                <Plus className="h-4 w-4" /> Setup Wizard
+                <Plus className="h-3.5 w-3.5" /> Setup
               </Button>
             </Link>
           </div>
         }
       />
 
-      {/* Grid of Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Main Stats Gauge */}
-        <Card className="flex items-center justify-between p-4 col-span-1 sm:col-span-2 border-border/80">
-          <div>
-            <span className="text-xs font-medium uppercase tracking-wider text-text-secondary">
-              Overall Attendance
-            </span>
-            <h3 className="text-2xl font-bold font-sans mt-1">
-              {totalAttended} / {totalDelivered} classes
-            </h3>
-            <p className="text-xs text-text-muted mt-2">
-              Target threshold is <span className="font-mono font-bold text-brand">{settings.targetThreshold}%</span>.
-            </p>
-          </div>
-          <RingProgress
-            value={overallPercentage}
-            status={getOverallStatus()}
-            size="md"
-            className="shrink-0"
-          />
-        </Card>
+      {/* Part 2 & 3: Overall Attendance Command Center */}
+      <OverallCommandCenter viewModel={viewModel} />
 
-        <StatCard
-          title="Safe Buffers"
-          value={safeSubjects}
-          description="Subjects where you can skip at least 1 class safely."
-          status="SAFE"
-          icon={<CheckCircle className="h-5 w-5 text-safe" />}
-        />
+      {/* Part 9: Recovery Alerts (if any) */}
+      <RecoveryAlertsCard alerts={viewModel.recoveryAlerts} />
 
-        <StatCard
-          title="Must Attend"
-          value={dangerSubjects}
-          description="Subjects below target. Recovery is required."
-          status="MUST_ATTEND"
-          icon={<AlertCircle className="h-5 w-5 text-danger" />}
-        />
-      </div>
-
-      {/* Primary Section: Today's Decisions */}
+      {/* Part 4, 5, 6: Today's Decision Center */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-lg font-bold text-text-primary">Today's Class Schedule</h2>
-            <p className="text-xs text-text-secondary">Select weekday to audit different schedules.</p>
+            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+              <Clock className="h-5 w-5 text-brand" /> Today's Class Schedule & Decisions
+            </h2>
+            <p className="text-xs text-text-secondary">
+              Real-time projection if you attend or skip today's classes.
+            </p>
           </div>
 
           {/* Weekday Selection Bar */}
           <div className="flex items-center gap-1 bg-surface border border-border p-1 rounded-lg overflow-x-auto max-w-full">
-            {(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] as DayOfWeek[]).map((day) => {
-              const count = timetable.filter((s) => s.day === day).length;
-              return (
-                <button
-                  key={day}
+            {(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] as DayOfWeek[]).map((day) => (
+              <button
+                key={day}
                   onClick={() => setSelectedDay(day)}
                   className={cn(
                     'px-2.5 py-1.5 rounded-md text-[10px] font-bold font-mono tracking-wider transition-colors cursor-pointer',
@@ -238,132 +254,119 @@ export const Dashboard: React.FC = () => {
                   )}
                 >
                   {day.slice(0, 3)}
-                  {count > 0 && (
-                    <span className="ml-1 rounded-full bg-surface-elevated text-text-secondary border border-border/50 text-[9px] px-1 font-bold">
-                      {count}
-                    </span>
-                  )}
                 </button>
-              );
-            })}
+            ))}
           </div>
         </div>
 
-        {sortedSlots.length === 0 ? (
+        {viewModel.todayClasses.length === 0 ? (
           <Card className="flex flex-col items-center justify-center p-8 text-center border-dashed border-border/60">
             <Clock className="h-8 w-8 text-text-muted mb-2" />
-            <p className="text-sm font-bold text-text-secondary">No slots scheduled for {selectedDay.toLowerCase()}</p>
+            <p className="text-sm font-bold text-text-secondary">
+              No classes scheduled for {selectedDay.toLowerCase()}
+            </p>
             <p className="text-xs text-text-muted mt-1 max-w-xs">
-              Go to the Timetable tab to populate classes for this day.
+              Go to the Timetable tab or click "Import Timetable" to add classes for this day.
             </p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedSlots.map((slot) => {
-              const subject = subjects.find((s) => s.id === slot.subjectId);
-              if (!subject) return null;
-
-              // Find existing log for today for this slot or component
-              const existingLog = logs.find(
-                (l) => (l.slotId && l.slotId === slot.id) || (l.componentId && l.componentId === slot.componentId && l.date === todayStr)
-              );
-              const currentStatus = existingLog ? (existingLog.status === 'ATTENDED' ? 'ATTENDED' : 'MISSED') : null;
-
-              // Calculate ifAttended and ifSkipped percentages in real-time
-              const currentAttended = subject.totalAttended;
-              const currentDelivered = subject.totalDelivered;
-              const ifAttended = ((currentAttended + 1) / (currentDelivered + 1)) * 100;
-              const ifSkipped = (currentAttended / (currentDelivered + 1)) * 100;
-
-              // Canonical Phase 4/10 skip impact recommendation
-              const skipImpact = calculateClassSkipImpact(currentAttended, currentDelivered, settings.targetThreshold);
-
-              return (
-                <DecisionCard
-                  key={slot.id}
-                  subjectName={slot.subjectName}
-                  subjectCode={slot.subjectCode}
-                  componentType={slot.componentType}
-                  componentName={slot.componentName}
-                  time={`${slot.startTime} - ${slot.endTime}`}
-                  room={slot.room}
-                  currentPercentage={subject.currentPercentage}
-                  ifAttendedPercentage={ifAttended}
-                  ifSkippedPercentage={ifSkipped}
-                  recommendation={skipImpact.recommendation}
-                  currentStatus={currentStatus}
-                  isSubmitting={submittingSlotId === slot.id}
-                  onLogAttendance={(status) =>
-                    handleLog(slot.id, slot.subjectId, slot.componentType, status, slot.componentId)
-                  }
-                />
-              );
-            })}
+            {viewModel.todayClasses.map((item) => (
+              <DecisionCard
+                key={item.slotId}
+                subjectName={item.subjectName}
+                subjectCode={item.subjectCode}
+                componentType={item.componentType}
+                componentName={item.componentName}
+                time={`${item.startTime} - ${item.endTime}`}
+                room={item.room}
+                currentPercentage={item.currentPercentage}
+                ifAttendedPercentage={item.ifAttendedPercentage}
+                ifSkippedPercentage={item.ifSkippedPercentage}
+                recommendation={item.skipImpactRecommendation}
+                explanation={item.explanation}
+                isMostImportant={item.isMostImportant}
+                currentStatus={item.currentStatus}
+                isSubmitting={submittingSlotId === item.slotId}
+                onLogAttendance={(status) =>
+                  handleLog(item.slotId, item.subjectId, item.componentType, status, item.componentId)
+                }
+              />
+            ))}
           </div>
         )}
       </div>
 
-      {/* Bottom Grid: Recent Activity Log */}
+      {/* Part 10: Safe Bunk Opportunities */}
+      <SafeBunkPlanCard opportunities={viewModel.safeBunkOpportunities} />
+
+      {/* Part 7 & 8: Subject Risk Overview & Prioritization */}
+      <SubjectRiskOverview subjects={viewModel.prioritizedSubjects} />
+
+      {/* Part 11 & 12: Semester Forecast & Trajectory + Part 13: What-If Simulator */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SemesterForecastCard forecast={viewModel.semesterForecast} />
+        <WhatIfSimulatorCard subjects={viewModel.prioritizedSubjects} />
+      </div>
+
+      {/* Recent Attendance Updates Log */}
       {logs.length > 0 && (
-        <Card className="p-4 border-border/80">
-          <div className="flex items-center justify-between border-b border-border/50 pb-3 mb-3">
+        <Card className="p-4 border-border/80 space-y-3">
+          <div className="flex items-center justify-between border-b border-border/50 pb-2">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-text-secondary" />
-              <h3 className="text-sm font-bold">Recent Attendance Updates</h3>
+              <h3 className="text-sm font-bold">Recent Attendance Log Updates</h3>
             </div>
-            <Link to="/app/history" className="text-[10px] text-brand hover:underline font-mono font-bold">
+            <Link to="/app/history" className="text-xs text-brand hover:underline font-mono font-bold">
               View Full History →
             </Link>
           </div>
 
-          <div className="divide-y divide-border/40 max-h-56 overflow-y-auto pr-1">
+          <div className="divide-y divide-border/40 max-h-52 overflow-y-auto pr-1">
             {logs.slice(0, 5).map((log) => (
-              <div key={log.id} className="flex items-center justify-between py-2.5 text-xs">
-                <div className="flex items-center gap-3">
+              <div key={log.id} className="flex items-center justify-between py-2 text-xs font-mono">
+                <div className="flex items-center gap-2">
                   <span
                     className={cn(
                       'h-2 w-2 rounded-full',
-                      log.status === 'ATTENDED' && 'bg-safe',
-                      log.status === 'MISSED' && 'bg-danger',
-                      log.status === 'BUNKED' && 'bg-danger',
-                      log.status === 'CANCELLED' && 'bg-text-muted'
+                      log.status === 'ATTENDED' ? 'bg-safe' : 'bg-danger'
                     )}
                   />
-                  <div>
-                    <span className="font-semibold text-text-primary">{log.subjectName}</span>
-                    <span className="text-text-muted ml-1 font-mono uppercase text-[9px] bg-surface-elevated border border-border px-1 py-0.5 rounded">
-                      {log.componentName || log.componentType}
-                    </span>
-                    <span className="text-text-secondary ml-2 font-mono">{log.date}</span>
-                    {log.time && <span className="text-text-muted ml-2 font-mono text-[10px]">({log.time})</span>}
-                  </div>
+                  <span className="font-bold text-text-primary">{log.subjectName}</span>
+                  <span className="text-text-muted text-[10px]">({log.date})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
-                      'font-mono font-bold text-[10px] px-1.5 py-0.5 rounded uppercase border',
-                      log.status === 'ATTENDED' && 'bg-safe-muted border-safe/25 text-safe',
-                      (log.status === 'MISSED' || log.status === 'BUNKED') && 'bg-danger-muted border-danger/25 text-danger',
-                      log.status === 'CANCELLED' && 'bg-surface-hover border-border text-text-muted'
+                      'px-1.5 py-0.5 rounded text-[10px] font-bold border',
+                      log.status === 'ATTENDED' ? 'bg-safe-muted text-safe border-safe/30' : 'bg-danger-muted text-danger border-danger/30'
                     )}
                   >
                     {log.status}
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
                     onClick={() => handleRevert(log.id, log.subjectName)}
-                    className="h-7 w-7 p-0 hover:bg-surface-elevated text-text-muted hover:text-text-primary rounded cursor-pointer"
-                    title="Revert update"
+                    className="p-1 text-text-muted hover:text-text-primary rounded cursor-pointer"
+                    title="Revert entry"
                   >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </Button>
+                    <RotateCcw className="h-3 w-3" />
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         </Card>
       )}
+
+      {/* Importer Modals */}
+      <TimetableImporter
+        isOpen={isTimetableImporterOpen}
+        onClose={() => setIsTimetableImporterOpen(false)}
+      />
+      <AttendanceImporter
+        isOpen={isAttendanceImporterOpen}
+        onClose={() => setIsAttendanceImporterOpen(false)}
+      />
     </div>
   );
 };

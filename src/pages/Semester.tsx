@@ -1,15 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAttendance } from '@/providers/AttendanceProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { CalendarSummaryCard } from '@/components/semester/CalendarSummaryCard';
+import { HolidayManager } from '@/components/semester/HolidayManager';
+import { SemesterCalendarStatus } from '@/components/semester/SemesterCalendarStatus';
+import { SemesterSelectorCard } from '@/components/semester/SemesterSelectorCard';
+import {
+  validateSemesterConfig,
+  calculateSemesterCalendarSummary,
+} from '@/lib/semesterCalendar';
 import { DayOfWeek } from '@/types';
 import { cn } from '@/lib/utils';
-import { GraduationCap, Calendar, Settings, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { GraduationCap, Calendar, AlertTriangle } from 'lucide-react';
 
 export const Semester: React.FC = () => {
-  const { settings, updateSettings, resetAllData } = useAttendance();
+  const {
+    settings,
+    semesters,
+    holidays: rawHolidays,
+    activeSemesterId,
+    switchSemester,
+    createSemester,
+    updateSemesterSettings,
+    deleteSemester,
+    addHoliday,
+    editHoliday,
+    removeHoliday,
+    resetAllData,
+  } = useAttendance();
   const { showToast } = useToast();
 
   const [name, setName] = useState(settings.name || '');
@@ -17,81 +38,86 @@ export const Semester: React.FC = () => {
   const [endDate, setEndDate] = useState(settings.endDate || '');
   const [threshold, setThreshold] = useState(settings.targetThreshold || 75);
   const [workingDays, setWorkingDays] = useState<DayOfWeek[]>(settings.workingDays || []);
-  const [holidayDate, setHolidayDate] = useState('');
-  const [holidays, setHolidays] = useState<string[]>(settings.holidays || []);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync form state when active semester settings change
+  useEffect(() => {
+    setName(settings.name || '');
+    setStartDate(settings.startDate || '');
+    setEndDate(settings.endDate || '');
+    setThreshold(settings.targetThreshold || 75);
+    setWorkingDays(settings.workingDays || []);
+  }, [settings]);
 
   const days: DayOfWeek[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
   const handleToggleDay = (day: DayOfWeek) => {
     if (workingDays.includes(day)) {
-      setWorkingDays(prev => prev.filter(d => d !== day));
+      setWorkingDays((prev) => prev.filter((d) => d !== day));
     } else {
-      setWorkingDays(prev => [...prev, day]);
+      setWorkingDays((prev) => [...prev, day]);
     }
   };
 
-  const handleAddHoliday = () => {
-    if (!holidayDate) return;
-    if (holidays.includes(holidayDate)) {
-      showToast({ title: 'Holiday Error', message: 'Holiday date already configured.', type: 'danger' });
-      return;
-    }
-    setHolidays(prev => [...prev, holidayDate].sort());
-    setHolidayDate('');
-    showToast({ title: 'Holiday Added', message: 'Exclusion registered successfully.', type: 'success' });
-  };
-
-  const handleRemoveHoliday = (date: string) => {
-    setHolidays(prev => prev.filter(d => d !== date));
-    showToast({ title: 'Holiday Removed', message: 'Date inclusion restored.', type: 'info' });
-  };
-
-  const handleSave = (e: React.FormEvent) => {
+  const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim()) {
-      showToast({ title: 'Validation Error', message: 'Semester name is required.', type: 'danger' });
-      return;
-    }
-    if (!startDate || !endDate) {
-      showToast({ title: 'Validation Error', message: 'Dates are required.', type: 'danger' });
-      return;
-    }
-    if (new Date(startDate) >= new Date(endDate)) {
-      showToast({ title: 'Validation Error', message: 'End date must be after start date.', type: 'danger' });
-      return;
-    }
-    if (workingDays.length === 0) {
-      showToast({ title: 'Validation Error', message: 'Select at least one working day.', type: 'danger' });
-      return;
-    }
-
-    updateSettings({
-      ...settings,
+    const configInput = {
       name: name.trim(),
       startDate,
       endDate,
       targetThreshold: threshold,
       workingDays,
-      holidays,
-    });
+    };
 
-    showToast({
-      title: 'Settings Saved',
-      message: 'Semester parameters successfully updated.',
-      type: 'success',
-    });
+    const validation = validateSemesterConfig(configInput);
+    if (!validation.isValid) {
+      showToast({
+        title: 'Validation Error',
+        message: validation.errors.join(' '),
+        type: 'danger',
+      });
+      return;
+    }
+
+    if (!activeSemesterId) {
+      showToast({ title: 'Error', message: 'No active semester selected.', type: 'danger' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await updateSemesterSettings(activeSemesterId, {
+        name: name.trim(),
+        startDate,
+        endDate,
+        targetThreshold: threshold,
+        workingDays,
+      });
+
+      showToast({
+        title: 'Configuration Saved',
+        message: 'Semester dates, working days, and target threshold updated.',
+        type: 'success',
+      });
+    } catch (err: any) {
+      showToast({
+        title: 'Save Failed',
+        message: err.message || 'Could not update semester configuration.',
+        type: 'danger',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
-    if (confirm('CAUTION: This will delete all course subjects, logged hours, and configurations permanently. This action is irreversible.')) {
+    if (
+      confirm(
+        'CAUTION: This will delete all course subjects, logged hours, and configurations permanently. This action is irreversible.'
+      )
+    ) {
       resetAllData();
-      setName('');
-      setStartDate('');
-      setEndDate('');
-      setThreshold(75);
-      setWorkingDays(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY']);
-      setHolidays([]);
       showToast({
         title: 'Factory Reset Complete',
         message: 'All local database entries purged.',
@@ -100,18 +126,52 @@ export const Semester: React.FC = () => {
     }
   };
 
+  const holidayList = rawHolidays.map((h) => ({
+    id: h.id,
+    semesterId: h.semester_id,
+    date: h.date,
+    name: h.name,
+  }));
+
+  const calendarSummary = calculateSemesterCalendarSummary(
+    startDate,
+    endDate,
+    workingDays,
+    holidayList
+  );
+
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <PageHeader
-        title="Semester Configuration"
-        description="Edit academic term guidelines, target attendance limits, and vacation schedules."
+        title="Semester & Calendar Intelligence"
+        description="Configure academic term boundaries, working days, and vacation schedules for accurate prediction."
       />
 
-      <form onSubmit={handleSave} className="space-y-6">
-        
+      {/* Semester Switching & Management */}
+      <SemesterSelectorCard
+        semesters={semesters}
+        activeSemesterId={activeSemesterId}
+        onSwitchSemester={switchSemester}
+        onCreateSemester={async (input) => {
+          await createSemester({
+            name: input.name,
+            startDate: input.startDate,
+            endDate: input.endDate,
+            threshold: input.threshold,
+          });
+        }}
+        onDeleteSemester={deleteSemester}
+        showToast={showToast}
+      />
+
+      {/* Calendar Summary Telemetry */}
+      <CalendarSummaryCard summary={calendarSummary} />
+
+      {/* Core Semester Configuration Form */}
+      <form onSubmit={handleSaveConfig} className="space-y-6">
         {/* Core Metadata */}
-        <Card className="space-y-4 border-border/80">
-          <h3 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-3">
+        <Card className="space-y-4 border-border/80 p-5">
+          <h3 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-3 text-text-primary">
             <GraduationCap className="h-4.5 w-4.5 text-brand" /> Core Configuration
           </h3>
 
@@ -134,7 +194,7 @@ export const Semester: React.FC = () => {
               </label>
               <input
                 type="number"
-                min="0"
+                min="1"
                 max="100"
                 value={threshold}
                 onChange={(e) => setThreshold(Number(e.target.value))}
@@ -145,8 +205,8 @@ export const Semester: React.FC = () => {
         </Card>
 
         {/* Date Ranges & Working Days */}
-        <Card className="space-y-4 border-border/80">
-          <h3 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-3">
+        <Card className="space-y-4 border-border/80 p-5">
+          <h3 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-3 text-text-primary">
             <Calendar className="h-4.5 w-4.5 text-brand" /> Date Ranges & Class Schedule
           </h3>
 
@@ -177,7 +237,7 @@ export const Semester: React.FC = () => {
 
           <div>
             <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
-              Active Lecture Days
+              Academic Working Days (Select at least 1)
             </label>
             <div className="flex flex-wrap gap-2 pt-1.5">
               {days.map((day) => {
@@ -202,63 +262,44 @@ export const Semester: React.FC = () => {
           </div>
         </Card>
 
-        {/* Holidays */}
-        <Card className="space-y-4 border-border/80">
-          <h3 className="text-sm font-bold flex items-center gap-2 border-b border-border pb-3">
-            <Settings className="h-4.5 w-4.5 text-brand" /> Term Holidays & Exclusions
-          </h3>
-
-          <div className="flex items-end gap-3 max-w-md">
-            <div className="flex-1">
-              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
-                Select Holiday Date
-              </label>
-              <input
-                type="date"
-                value={holidayDate}
-                onChange={(e) => setHolidayDate(e.target.value)}
-                className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm font-mono focus:outline-none"
-              />
-            </div>
-            <Button type="button" onClick={handleAddHoliday} className="h-10 flex items-center gap-1.5 cursor-pointer">
-              <Plus className="h-4 w-4" /> Add Date
-            </Button>
-          </div>
-
-          {holidays.length > 0 && (
-            <div className="border border-border rounded-lg max-h-40 overflow-y-auto divide-y divide-border/50 max-w-md mt-2">
-              {holidays.map((hDate) => (
-                <div key={hDate} className="flex items-center justify-between p-2.5 text-xs hover:bg-surface-elevated/40">
-                  <span className="font-mono text-text-primary font-medium">{hDate}</span>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleRemoveHoliday(hDate)}
-                    className="h-7 w-7 p-0 text-text-muted hover:text-danger cursor-pointer"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        {/* Action Controls */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border pt-5">
+        {/* Save Controls */}
+        <div className="flex justify-end pt-2">
           <Button
-            type="button"
-            variant="ghost"
-            onClick={handleReset}
-            className="text-text-muted hover:text-danger hover:bg-danger-muted/10 border border-transparent hover:border-danger/20 w-full sm:w-auto flex items-center gap-2 cursor-pointer"
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full sm:w-auto h-10 px-8 cursor-pointer"
           >
-            <AlertTriangle className="h-4 w-4" /> Hard Reset All Data
-          </Button>
-
-          <Button type="submit" className="w-full sm:w-auto h-10 px-8 cursor-pointer">
-            Save Configuration
+            Save Semester Parameters
           </Button>
         </div>
       </form>
+
+      {/* Holiday Manager */}
+      <HolidayManager
+        holidays={holidayList}
+        startDate={startDate}
+        endDate={endDate}
+        workingDays={workingDays}
+        onAddHoliday={addHoliday}
+        onEditHoliday={editHoliday}
+        onDeleteHoliday={removeHoliday}
+        showToast={showToast}
+      />
+
+      {/* Calendar Impact & Conflict Status Preview */}
+      <SemesterCalendarStatus summary={calendarSummary} />
+
+      {/* Danger Zone */}
+      <div className="pt-4 border-t border-border flex justify-start">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={handleReset}
+          className="text-text-muted hover:text-danger hover:bg-danger-muted/10 border border-transparent hover:border-danger/20 flex items-center gap-2 cursor-pointer text-xs"
+        >
+          <AlertTriangle className="h-4 w-4" /> Hard Reset All Data
+        </Button>
+      </div>
     </div>
   );
 };
