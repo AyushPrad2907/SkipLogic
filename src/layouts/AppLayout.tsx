@@ -196,10 +196,10 @@ export const AppLayout: React.FC = () => {
       {/* 2. MOBILE TOP NAVIGATION & CONTENT SHELL */}
       <div className="flex-1 flex flex-col min-w-0">
         
-        {/* Mobile Header Bar */}
-        <header className="md:hidden h-16 bg-surface border-b border-border px-4 flex items-center justify-between sticky top-0 z-20">
-          <Link to="/app" className="flex items-center gap-2">
-            <span className="font-mono font-black text-xl tracking-tight bg-gradient-to-r from-brand to-indigo-400 bg-clip-text text-transparent">
+        {/* Mobile Header Bar (Frosted Glass & Sticky) */}
+        <header className="md:hidden h-14 bg-surface/85 backdrop-blur-xl border-b border-border px-4 flex items-center justify-between sticky top-0 z-30 transition-all">
+          <Link to="/app" className="flex items-center gap-2 active:scale-95 transition-transform">
+            <span className="font-mono font-black text-xl tracking-tight bg-gradient-to-r from-brand via-indigo-500 to-purple-500 bg-clip-text text-transparent">
               SkipLogic
             </span>
           </Link>
@@ -207,7 +207,8 @@ export const AppLayout: React.FC = () => {
             <ThemeToggle />
             <button
               onClick={() => setProfileOpen(!profileOpen)}
-              className="h-8 w-8 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-semibold text-xs cursor-pointer"
+              className="h-8 w-8 rounded-full bg-brand/15 border border-brand/30 flex items-center justify-center text-brand font-semibold text-xs active:scale-90 transition-transform cursor-pointer shadow-sm"
+              aria-label="User profile"
             >
               {userInitial}
             </button>
@@ -215,31 +216,51 @@ export const AppLayout: React.FC = () => {
           
           {/* Mobile Profile Dropdown Overlay */}
           {profileOpen && (
-            <div className="absolute top-16 right-4 w-56 bg-surface border border-border rounded-lg shadow-xl py-1 z-30 animate-in fade-in slide-in-from-top-2">
-              <div className="px-4 py-2 border-b border-border">
-                <p className="text-xs font-semibold text-text-primary">Student Account</p>
-                <p className="text-[10px] text-text-muted truncate">{userEmail}</p>
+            <div className="absolute top-14 right-4 w-60 bg-surface/95 backdrop-blur-2xl border border-border rounded-xl shadow-2xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-4 py-2.5 border-b border-border">
+                <p className="text-xs font-bold text-text-primary">Student Account</p>
+                <p className="text-[11px] font-mono text-text-muted truncate mt-0.5">{userEmail}</p>
               </div>
-              <button
-                onClick={handleLoadMock}
-                className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-brand font-semibold transition-colors flex items-center gap-2 cursor-pointer"
-              >
-                <Calendar className="h-3.5 w-3.5" />
-                Load Mock Data
-              </button>
-              <button
-                onClick={handleResetData}
-                className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-danger font-semibold transition-colors flex items-center gap-2 cursor-pointer"
-              >
-                <Settings className="h-3.5 w-3.5" />
-                Reset Local Data
-              </button>
+              
+              <div className="py-1">
+                <Link
+                  to="/app/semester"
+                  onClick={() => setProfileOpen(false)}
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary transition-colors flex items-center gap-2.5"
+                >
+                  <GraduationCap className="h-4 w-4 text-brand" />
+                  Semester Settings
+                </Link>
+                <Link
+                  to="/app/history"
+                  onClick={() => setProfileOpen(false)}
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary transition-colors flex items-center gap-2.5"
+                >
+                  <History className="h-4 w-4 text-brand" />
+                  Attendance History
+                </Link>
+                <button
+                  onClick={handleLoadMock}
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-brand font-medium transition-colors flex items-center gap-2.5 cursor-pointer"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Load Sample Data
+                </button>
+                <button
+                  onClick={handleResetData}
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-danger font-medium transition-colors flex items-center gap-2.5 cursor-pointer"
+                >
+                  <Settings className="h-4 w-4" />
+                  Reset Local Data
+                </button>
+              </div>
+
               <div className="border-t border-border my-1" />
               <button
                 onClick={handleLogout}
-                className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary transition-colors flex items-center gap-2 cursor-pointer"
+                className="w-full px-4 py-2 text-left text-xs hover:bg-danger-muted text-danger font-bold transition-colors flex items-center gap-2.5 cursor-pointer"
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <LogOut className="h-4 w-4" />
                 Sign Out
               </button>
             </div>
@@ -247,15 +268,21 @@ export const AppLayout: React.FC = () => {
         </header>
 
         {/* Page Content Layout */}
-        <main className="flex-1 px-4 py-6 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full pb-24 md:pb-8">
+        <main className="flex-1 px-3.5 py-5 sm:px-6 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full pb-24 md:pb-8">
           <ErrorBoundary fallbackTitle="An error occurred while loading this view">
             <Outlet />
           </ErrorBoundary>
         </main>
 
-        {/* 3. MOBILE BOTTOM NAVIGATION (hidden on desktop) */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface border-t border-border flex items-center justify-around px-2 z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.1)]">
-          {menuItems.map((item) => {
+        {/* 3. MOBILE BOTTOM NAVIGATION (Fast, 5-core-item native feel) */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface/90 backdrop-blur-xl border-t border-border/80 flex items-center justify-around px-1 z-30 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] pb-[max(env(safe-area-inset-bottom),0px)]">
+          {[
+            { label: 'Home', path: '/app', icon: LayoutDashboard },
+            { label: 'Coach', path: '/app/coach', icon: Sparkles },
+            { label: 'Subjects', path: '/app/subjects', icon: BookOpen },
+            { label: 'Timetable', path: '/app/timetable', icon: Calendar },
+            { label: 'Analytics', path: '/app/analytics', icon: TrendingUp },
+          ].map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
             return (
@@ -263,12 +290,19 @@ export const AppLayout: React.FC = () => {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  'flex flex-col items-center justify-center flex-1 h-full py-1 text-center select-none',
-                  isActive ? 'text-brand font-semibold' : 'text-text-secondary'
+                  'flex flex-col items-center justify-center flex-1 h-full py-1 text-center select-none active:scale-90 transition-all duration-150',
+                  isActive ? 'text-brand font-bold' : 'text-text-muted hover:text-text-secondary'
                 )}
               >
-                <Icon className={cn('h-5 w-5 mb-0.5', isActive ? 'text-brand' : 'text-text-secondary')} />
-                <span className="text-[10px] tracking-wide">{item.label}</span>
+                <div
+                  className={cn(
+                    'p-1 rounded-xl transition-all',
+                    isActive && 'bg-brand/15 text-brand shadow-[0_0_10px_rgba(99,102,241,0.25)]'
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="text-[10px] tracking-tight mt-0.5">{item.label}</span>
               </Link>
             );
           })}

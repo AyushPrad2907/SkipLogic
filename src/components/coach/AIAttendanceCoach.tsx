@@ -263,7 +263,7 @@ export const AIAttendanceCoach: React.FC = () => {
       </div>
 
       {/* 3. Quick Question Chips */}
-      <div className="p-3 bg-surface border-t border-border/60 overflow-x-auto flex items-center gap-2">
+      <div className="p-3 bg-surface border-t border-border/60 overflow-x-auto flex items-center gap-2 no-scrollbar">
         <span className="text-[10px] font-mono font-bold uppercase text-text-muted shrink-0 flex items-center gap-1">
           <HelpCircle className="h-3 w-3" /> Quick Ask:
         </span>
@@ -272,7 +272,7 @@ export const AIAttendanceCoach: React.FC = () => {
             key={q}
             onClick={() => handleSend(q)}
             disabled={isProcessing}
-            className="px-2.5 py-1 rounded-full bg-surface-elevated border border-border text-[11px] font-medium text-text-secondary hover:text-brand hover:border-brand/40 transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
+            className="px-2.5 py-1 rounded-full bg-surface-elevated border border-border text-[11px] font-medium text-text-secondary hover:text-brand hover:border-brand/40 active:scale-95 transition-all duration-150 whitespace-nowrap cursor-pointer disabled:opacity-50 shrink-0"
           >
             {q}
           </button>

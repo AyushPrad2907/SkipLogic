@@ -235,15 +235,15 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Weekday Selection Bar */}
-          <div className="flex items-center gap-1 bg-surface border border-border p-1 rounded-lg overflow-x-auto max-w-full">
+          <div className="flex items-center gap-1 bg-surface border border-border p-1 rounded-xl overflow-x-auto max-w-full no-scrollbar shrink-0 shadow-sm">
             {(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] as DayOfWeek[]).map((day) => (
               <button
                 key={day}
                 onClick={() => setSelectedDay(day)}
                 className={cn(
-                  'px-2.5 py-1.5 rounded-md text-[10px] font-bold font-mono tracking-wider transition-colors cursor-pointer',
+                  'px-3 py-1.5 rounded-lg text-xs font-bold font-mono tracking-wider transition-all duration-150 active:scale-95 cursor-pointer shrink-0',
                   selectedDay === day
-                    ? 'bg-brand text-white'
+                    ? 'bg-brand text-white shadow-sm'
                     : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
                 )}
               >
