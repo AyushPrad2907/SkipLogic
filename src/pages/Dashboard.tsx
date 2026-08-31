@@ -222,13 +222,7 @@ export const Dashboard: React.FC = () => {
         }
       />
 
-      {/* Part 2 & 3: Overall Attendance Command Center */}
-      <OverallCommandCenter viewModel={viewModel} />
-
-      {/* Part 9: Recovery Alerts (if any) */}
-      <RecoveryAlertsCard alerts={viewModel.recoveryAlerts} />
-
-      {/* Part 4, 5, 6: Today's Decision Center */}
+      {/* 1. Today's Class Schedule & Decisions (Top Priority for Daily Student Use) */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
@@ -245,16 +239,16 @@ export const Dashboard: React.FC = () => {
             {(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] as DayOfWeek[]).map((day) => (
               <button
                 key={day}
-                  onClick={() => setSelectedDay(day)}
-                  className={cn(
-                    'px-2.5 py-1.5 rounded-md text-[10px] font-bold font-mono tracking-wider transition-colors cursor-pointer',
-                    selectedDay === day
-                      ? 'bg-brand text-white'
-                      : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
-                  )}
-                >
-                  {day.slice(0, 3)}
-                </button>
+                onClick={() => setSelectedDay(day)}
+                className={cn(
+                  'px-2.5 py-1.5 rounded-md text-[10px] font-bold font-mono tracking-wider transition-colors cursor-pointer',
+                  selectedDay === day
+                    ? 'bg-brand text-white'
+                    : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
+                )}
+              >
+                {day.slice(0, 3)}
+              </button>
             ))}
           </div>
         </div>
@@ -297,13 +291,19 @@ export const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Part 10: Safe Bunk Opportunities */}
+      {/* 2. Recovery & Action Needed Alerts */}
+      <RecoveryAlertsCard alerts={viewModel.recoveryAlerts} />
+
+      {/* 3. Overall Attendance Command Center */}
+      <OverallCommandCenter viewModel={viewModel} />
+
+      {/* 4. Safe Bunk Opportunities */}
       <SafeBunkPlanCard opportunities={viewModel.safeBunkOpportunities} />
 
-      {/* Part 7 & 8: Subject Risk Overview & Prioritization */}
+      {/* 5. Subject Risk Overview & Prioritization */}
       <SubjectRiskOverview subjects={viewModel.prioritizedSubjects} />
 
-      {/* Part 11 & 12: Semester Forecast & Trajectory + Part 13: What-If Simulator */}
+      {/* 6. Semester Forecast & Trajectory + What-If Simulator */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SemesterForecastCard forecast={viewModel.semesterForecast} />
         <WhatIfSimulatorCard subjects={viewModel.prioritizedSubjects} />
