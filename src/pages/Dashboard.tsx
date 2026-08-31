@@ -291,11 +291,11 @@ export const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* 2. Recovery & Action Needed Alerts */}
-      <RecoveryAlertsCard alerts={viewModel.recoveryAlerts} />
-
-      {/* 3. Overall Attendance Command Center */}
+      {/* 2. Overall Attendance Command Center */}
       <OverallCommandCenter viewModel={viewModel} />
+
+      {/* 3. Recovery & Action Needed Alerts */}
+      <RecoveryAlertsCard alerts={viewModel.recoveryAlerts} />
 
       {/* 4. Safe Bunk Opportunities */}
       <SafeBunkPlanCard opportunities={viewModel.safeBunkOpportunities} />
