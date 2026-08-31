@@ -114,11 +114,10 @@ export function parseAttendanceWorksheet(
     for (let c = 0; c < row.length; c++) {
       const val = row[c].toUpperCase();
 
-      if (val.includes('SUBJECT') || val.includes('COURSE') || val.includes('PAPER') || val.includes('MODULE')) {
-        subjectCol = c;
-      }
       if (val.includes('CODE') || val.includes('SUB CODE') || val.includes('COURSE CODE')) {
         codeCol = c;
+      } else if (val.includes('SUBJECT') || val.includes('COURSE') || val.includes('PAPER') || val.includes('MODULE')) {
+        subjectCol = c;
       }
       if (val.includes('COMPONENT') || val.includes('TYPE') || val === 'L/T/P' || val.includes('CATEGORY')) {
         compCol = c;
@@ -145,7 +144,7 @@ export function parseAttendanceWorksheet(
       if (val.includes('ATTENDED/DELIVERED') || val.includes('ATTENDANCE/TOTAL') || val.includes('ATTENDED / TOTAL')) {
         fractionCol = c;
       }
-      if (val.includes('PERCENTAGE') || val.includes('ATTENDANCE %') || val.includes('ATTD %') || val === '%') {
+      if (val.includes('PERCENT') || val.includes('ATTENDANCE %') || val.includes('ATTD %') || val === '%') {
         percentageCol = c;
       }
     }
@@ -180,8 +179,8 @@ export function parseAttendanceWorksheet(
     const rawSub = textRow[subjectCol] || '';
     if (!rawSub || rawSub.trim().length === 0) continue;
 
-    // Skip footer summary rows like "Total", "Average"
-    if (/^(TOTAL|AVERAGE|GRAND TOTAL|OVERALL)$/i.test(rawSub.trim())) continue;
+    // Skip footer summary rows like "Total", "Average", "Total Percentage"
+    if (/^(TOTAL|AVERAGE|GRAND TOTAL|OVERALL|TOTAL PERCENTAGE|TOTAL ATTENDANCE|SUMMARY)/i.test(rawSub.trim())) continue;
 
     const { code: extractedCode, name: extractedName } = extractSubjectCodeAndName(rawSub);
     const subjectCode = codeCol !== -1 && textRow[codeCol] ? textRow[codeCol] : extractedCode;
