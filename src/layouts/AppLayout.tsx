@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   BookOpen,
   Calendar,
-  Settings,
   GraduationCap,
   History,
   TrendingUp,
@@ -15,14 +14,12 @@ import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useToast } from '@/providers/ToastProvider';
-import { useAttendance } from '@/providers/AttendanceProvider';
 import { supabase } from '@/lib/supabase';
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { resetAllData, loadMockData } = useAttendance();
   const [profileOpen, setProfileOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string>('guest@skiplogic.io');
   const [userInitial, setUserInitial] = useState<string>('S');
@@ -77,26 +74,6 @@ export const AppLayout: React.FC = () => {
         type: 'danger',
       });
     }
-  };
-
-  const handleLoadMock = () => {
-    loadMockData();
-    showToast({
-      title: 'Mock Data Loaded',
-      message: 'Successfully populated dashboard with sample classes and attendance log.',
-      type: 'success',
-    });
-    setProfileOpen(false);
-  };
-
-  const handleResetData = () => {
-    resetAllData();
-    showToast({
-      title: 'Data Cleared',
-      message: 'All local attendance data and subjects have been reset.',
-      type: 'warning',
-    });
-    setProfileOpen(false);
   };
 
   return (
@@ -154,40 +131,42 @@ export const AppLayout: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => setProfileOpen(!profileOpen)}
-              className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-surface-elevated transition-colors text-left border border-transparent hover:border-border cursor-pointer"
+              className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-surface-elevated transition-colors text-left border border-transparent hover:border-border cursor-pointer select-none"
             >
-              <div className="h-9 w-9 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-semibold text-sm">
+              <div className="h-9 w-9 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-bold text-sm shadow-xs">
                 {userInitial}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-text-primary truncate">Student Account</p>
-                <p className="text-xs text-text-muted truncate">{userEmail}</p>
+                <p className="text-sm font-bold text-text-primary truncate">Student Account</p>
+                <p className="text-xs text-text-muted truncate font-mono">{userEmail}</p>
               </div>
             </button>
 
             {/* Profile Dropdown Context Menu */}
             {profileOpen && (
-              <div className="absolute bottom-full left-0 w-full mb-2 bg-surface border border-border rounded-lg shadow-xl py-1 z-30 animate-in fade-in slide-in-from-bottom-2">
-                <button
-                  onClick={handleLoadMock}
-                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-brand font-semibold transition-colors flex items-center gap-2 cursor-pointer"
+              <div className="absolute bottom-full left-0 w-full mb-2 bg-surface/95 backdrop-blur-xl border border-border/80 rounded-xl shadow-2xl py-1.5 z-30 animate-in fade-in slide-in-from-bottom-2">
+                <Link
+                  to="/app/semester"
+                  onClick={() => setProfileOpen(false)}
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary font-medium transition-colors flex items-center gap-2.5"
                 >
-                  <Calendar className="h-3.5 w-3.5" />
-                  Load Mock Data
-                </button>
-                <button
-                  onClick={handleResetData}
-                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-danger font-semibold transition-colors flex items-center gap-2 cursor-pointer"
+                  <GraduationCap className="h-4 w-4 text-brand" />
+                  Semester Settings
+                </Link>
+                <Link
+                  to="/app/history"
+                  onClick={() => setProfileOpen(false)}
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary font-medium transition-colors flex items-center gap-2.5"
                 >
-                  <Settings className="h-3.5 w-3.5" />
-                  Reset Local Data
-                </button>
-                <div className="border-t border-border my-1" />
+                  <History className="h-4 w-4 text-brand" />
+                  Attendance History
+                </Link>
+                <div className="border-t border-border/60 my-1" />
                 <button
                   onClick={handleLogout}
-                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary transition-colors flex items-center gap-2 cursor-pointer"
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-danger-muted text-danger font-bold transition-colors flex items-center gap-2.5 cursor-pointer"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
+                  <LogOut className="h-4 w-4" />
                   Sign Out
                 </button>
               </div>
@@ -202,7 +181,7 @@ export const AppLayout: React.FC = () => {
         {/* Mobile Header Bar (Frosted Glass & Sticky) */}
         <header className="md:hidden h-14 bg-surface/85 backdrop-blur-xl border-b border-border px-4 flex items-center justify-between sticky top-0 z-30 transition-all">
           <Link to="/app" className="flex items-center gap-2 active:scale-95 transition-transform">
-            <span className="font-mono font-black text-xl tracking-tight bg-gradient-to-r from-brand via-indigo-500 to-purple-500 bg-clip-text text-transparent">
+            <span className="font-mono font-black text-xl tracking-tight bg-gradient-to-r from-brand via-sky-400 to-indigo-400 bg-clip-text text-transparent">
               SkipLogic
             </span>
           </Link>
@@ -210,7 +189,7 @@ export const AppLayout: React.FC = () => {
             <ThemeToggle />
             <button
               onClick={() => setProfileOpen(!profileOpen)}
-              className="h-8 w-8 rounded-full bg-brand/15 border border-brand/30 flex items-center justify-center text-brand font-semibold text-xs active:scale-90 transition-transform cursor-pointer shadow-sm"
+              className="h-8 w-8 rounded-full bg-brand/15 border border-brand/30 flex items-center justify-center text-brand font-bold text-xs active:scale-90 transition-transform cursor-pointer shadow-sm"
               aria-label="User profile"
             >
               {userInitial}
@@ -229,7 +208,7 @@ export const AppLayout: React.FC = () => {
                 <Link
                   to="/app/semester"
                   onClick={() => setProfileOpen(false)}
-                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary transition-colors flex items-center gap-2.5"
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary font-medium transition-colors flex items-center gap-2.5"
                 >
                   <GraduationCap className="h-4 w-4 text-brand" />
                   Semester Settings
@@ -237,25 +216,11 @@ export const AppLayout: React.FC = () => {
                 <Link
                   to="/app/history"
                   onClick={() => setProfileOpen(false)}
-                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary transition-colors flex items-center gap-2.5"
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary font-medium transition-colors flex items-center gap-2.5"
                 >
                   <History className="h-4 w-4 text-brand" />
                   Attendance History
                 </Link>
-                <button
-                  onClick={handleLoadMock}
-                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-brand font-medium transition-colors flex items-center gap-2.5 cursor-pointer"
-                >
-                  <Calendar className="h-4 w-4" />
-                  Load Sample Data
-                </button>
-                <button
-                  onClick={handleResetData}
-                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-danger font-medium transition-colors flex items-center gap-2.5 cursor-pointer"
-                >
-                  <Settings className="h-4 w-4" />
-                  Reset Local Data
-                </button>
               </div>
 
               <div className="border-t border-border my-1" />
