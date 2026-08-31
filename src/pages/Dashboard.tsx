@@ -23,6 +23,7 @@ import {
   Plus,
   Play,
   Clock,
+  Calendar,
   History,
   Upload,
   FileSpreadsheet,
@@ -31,14 +32,12 @@ import {
   BookOpen,
   RotateCcw,
 } from 'lucide-react';
-import { DayOfWeek } from '@/types';
 
 export const Dashboard: React.FC = () => {
   const { logs } = useAttendance();
   const {
     viewModel,
     selectedDay,
-    setSelectedDay,
     isLoading,
     isError,
     error,
@@ -238,33 +237,22 @@ export const Dashboard: React.FC = () => {
             </p>
           </div>
 
-          {/* Weekday Selection Bar */}
-          <div className="flex items-center gap-1 bg-surface border border-border p-1 rounded-xl overflow-x-auto max-w-full no-scrollbar shrink-0 shadow-sm">
-            {(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] as DayOfWeek[]).map((day) => (
-              <button
-                key={day}
-                onClick={() => setSelectedDay(day)}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-bold font-mono tracking-wider transition-all duration-150 active:scale-95 cursor-pointer shrink-0',
-                  selectedDay === day
-                    ? 'bg-brand text-white shadow-sm'
-                    : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
-                )}
-              >
-                {day.slice(0, 3)}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 bg-surface-elevated/80 border border-border/80 px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold text-text-primary shadow-xs shrink-0 self-start sm:self-center">
+            <Calendar className="h-4 w-4 text-brand" />
+            <span>
+              {new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).format(new Date())}
+            </span>
           </div>
         </div>
 
         {viewModel.todayClasses.length === 0 ? (
-          <Card className="flex flex-col items-center justify-center p-8 text-center border-dashed border-border/60">
+          <Card variant="glass" className="flex flex-col items-center justify-center p-8 text-center border-dashed border-border/70">
             <Clock className="h-8 w-8 text-text-muted mb-2" />
             <p className="text-sm font-bold text-text-secondary">
-              No classes scheduled for {selectedDay.toLowerCase()}
+              No classes scheduled for today ({selectedDay.toLowerCase()})
             </p>
             <p className="text-xs text-text-muted mt-1 max-w-xs">
-              Go to the Timetable tab or click "Import Timetable" to add classes for this day.
+              Go to the Timetable tab or click "Import Timetable" to add or check classes.
             </p>
           </Card>
         ) : (

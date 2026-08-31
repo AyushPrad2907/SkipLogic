@@ -42,7 +42,7 @@ export function useDashboardData(): UseDashboardDataResult {
   const days: DayOfWeek[] = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => {
     const todayIndex = new Date().getDay();
-    return days[todayIndex] === 'SUNDAY' || days[todayIndex] === 'SATURDAY' ? 'MONDAY' : days[todayIndex];
+    return days[todayIndex];
   });
 
   const currentDateStr = useMemo(() => new Date().toISOString().split('T')[0], []);
