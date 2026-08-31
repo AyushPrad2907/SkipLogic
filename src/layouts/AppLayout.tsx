@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   BookOpen,
@@ -16,12 +16,39 @@ import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useToast } from '@/providers/ToastProvider';
 import { useAttendance } from '@/providers/AttendanceProvider';
+import { supabase } from '@/lib/supabase';
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const { resetAllData, loadMockData } = useAttendance();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('guest@skiplogic.io');
+  const [userInitial, setUserInitial] = useState<string>('S');
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        setUserEmail(data.user.email);
+        setUserInitial(data.user.email.charAt(0).toUpperCase());
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.email) {
+        setUserEmail(session.user.email);
+        setUserInitial(session.user.email.charAt(0).toUpperCase());
+      } else {
+        setUserEmail('guest@skiplogic.io');
+        setUserInitial('G');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const menuItems = [
     { label: 'Dashboard', path: '/app', icon: LayoutDashboard },
@@ -33,13 +60,23 @@ export const AppLayout: React.FC = () => {
     { label: 'Semester', path: '/app/semester', icon: GraduationCap },
   ];
 
-  const handleLogoutPlaceholder = () => {
-    showToast({
-      title: 'Sign Out Attempted',
-      message: 'Authentication session management will be added in Phase 3.',
-      type: 'info',
-    });
+  const handleLogout = async () => {
     setProfileOpen(false);
+    try {
+      await supabase.auth.signOut();
+      showToast({
+        title: 'Signed Out',
+        message: 'You have been signed out successfully.',
+        type: 'info',
+      });
+      navigate('/auth');
+    } catch (err: any) {
+      showToast({
+        title: 'Sign Out Error',
+        message: err?.message || 'Failed to sign out.',
+        type: 'danger',
+      });
+    }
   };
 
   const handleLoadMock = () => {
@@ -55,28 +92,31 @@ export const AppLayout: React.FC = () => {
   const handleResetData = () => {
     resetAllData();
     showToast({
-      title: 'Data Reset',
-      message: 'All local attendance data and configurations cleared.',
+      title: 'Data Cleared',
+      message: 'All local attendance data and subjects have been reset.',
       type: 'warning',
     });
     setProfileOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-background text-text-primary flex flex-col md:flex-row transition-colors duration-200">
-      
-      {/* 1. DESKTOP SIDEBAR (hidden on mobile) */}
-      <aside className="hidden md:flex flex-col w-64 bg-surface border-r border-border shrink-0 sticky top-0 h-screen z-20">
-        {/* Sidebar Logo */}
-        <div className="h-16 flex items-center justify-between px-6 border-b border-border">
+    <div className="min-h-screen bg-background text-text-primary flex flex-col md:flex-row">
+      {/* 1. DESKTOP SIDEBAR NAVIGATION */}
+      <aside className="hidden md:flex flex-col w-64 border-r border-border bg-surface shrink-0 h-screen sticky top-0">
+        
+        {/* Brand Header */}
+        <div className="p-6 border-b border-border flex items-center justify-between">
           <Link to="/app" className="flex items-center gap-2">
-            <span className="font-mono font-black text-xl tracking-tight bg-gradient-to-r from-brand to-indigo-400 bg-clip-text text-transparent">
+            <span className="font-mono font-black text-2xl tracking-tight bg-gradient-to-r from-brand to-indigo-400 bg-clip-text text-transparent">
               SkipLogic
             </span>
           </Link>
+          <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
+            PRO
+          </span>
         </div>
 
-        {/* Sidebar Navigation */}
+        {/* Menu Navigation Items */}
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -86,13 +126,13 @@ export const AppLayout: React.FC = () => {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 group relative',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors select-none',
                   isActive
-                    ? 'bg-brand/10 text-brand border-l-2 border-brand font-semibold'
+                    ? 'bg-brand text-white shadow-sm'
                     : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
                 )}
               >
-                <Icon className={cn('h-[18px] w-[18px]', isActive ? 'text-brand' : 'text-text-secondary group-hover:text-text-primary')} />
+                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-text-secondary')} />
                 {item.label}
               </Link>
             );
@@ -114,11 +154,11 @@ export const AppLayout: React.FC = () => {
               className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-surface-elevated transition-colors text-left border border-transparent hover:border-border cursor-pointer"
             >
               <div className="h-9 w-9 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-semibold text-sm">
-                S
+                {userInitial}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-text-primary truncate">Student Account</p>
-                <p className="text-xs text-text-muted truncate">skipper@skiplogic.io</p>
+                <p className="text-xs text-text-muted truncate">{userEmail}</p>
               </div>
             </button>
 
@@ -141,7 +181,7 @@ export const AppLayout: React.FC = () => {
                 </button>
                 <div className="border-t border-border my-1" />
                 <button
-                  onClick={handleLogoutPlaceholder}
+                  onClick={handleLogout}
                   className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary transition-colors flex items-center gap-2 cursor-pointer"
                 >
                   <LogOut className="h-3.5 w-3.5" />
@@ -169,7 +209,7 @@ export const AppLayout: React.FC = () => {
               onClick={() => setProfileOpen(!profileOpen)}
               className="h-8 w-8 rounded-full bg-brand/20 border border-brand/30 flex items-center justify-center text-brand font-semibold text-xs cursor-pointer"
             >
-              S
+              {userInitial}
             </button>
           </div>
           
@@ -178,7 +218,7 @@ export const AppLayout: React.FC = () => {
             <div className="absolute top-16 right-4 w-56 bg-surface border border-border rounded-lg shadow-xl py-1 z-30 animate-in fade-in slide-in-from-top-2">
               <div className="px-4 py-2 border-b border-border">
                 <p className="text-xs font-semibold text-text-primary">Student Account</p>
-                <p className="text-[10px] text-text-muted truncate">skipper@skiplogic.io</p>
+                <p className="text-[10px] text-text-muted truncate">{userEmail}</p>
               </div>
               <button
                 onClick={handleLoadMock}
@@ -196,7 +236,7 @@ export const AppLayout: React.FC = () => {
               </button>
               <div className="border-t border-border my-1" />
               <button
-                onClick={handleLogoutPlaceholder}
+                onClick={handleLogout}
                 className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary transition-colors flex items-center gap-2 cursor-pointer"
               >
                 <LogOut className="h-3.5 w-3.5" />

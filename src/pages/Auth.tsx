@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/providers/ToastProvider';
+import { supabase } from '@/lib/supabase';
 
 export const Auth: React.FC = () => {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export const Auth: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -23,31 +24,101 @@ export const Auth: React.FC = () => {
       return;
     }
 
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
     setIsLoading(true);
 
-    // Mock timeout for realistic auth submission feedback
-    setTimeout(() => {
+    try {
+      if (isSignUp) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        });
+
+        if (signUpError) {
+          setError(signUpError.message);
+          showToast({
+            title: 'Registration Failed',
+            message: signUpError.message,
+            type: 'danger',
+          });
+          return;
+        }
+
+        if (data.session) {
+          showToast({
+            title: 'Account Created',
+            message: 'Welcome to SkipLogic! Setting up your workspace.',
+            type: 'success',
+          });
+          navigate('/app/setup');
+        } else {
+          showToast({
+            title: 'Account Created',
+            message: 'Account created! You can now sign in or verify your email if required.',
+            type: 'success',
+          });
+          setIsSignUp(false);
+        }
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (signInError) {
+          setError(signInError.message);
+          showToast({
+            title: 'Sign In Failed',
+            message: signInError.message,
+            type: 'danger',
+          });
+          return;
+        }
+
+        showToast({
+          title: 'Welcome Back',
+          message: 'Signed in successfully.',
+          type: 'success',
+        });
+        navigate('/app');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'An unexpected authentication error occurred.');
+    } finally {
       setIsLoading(false);
-      showToast({
-        title: 'Visual Sandbox Login',
-        message: 'Proceeding with temporary session (Supabase Auth comes in Phase 3).',
-        type: 'success',
-      });
-      navigate('/app');
-    }, 1200);
+    }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      showToast({
-        title: 'Social Login Attempted',
-        message: 'Google OAuth integration will be connected in Phase 3.',
-        type: 'info',
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/app`,
+        },
       });
-      navigate('/app');
-    }, 1000);
+
+      if (oauthError) {
+        showToast({
+          title: 'OAuth Error',
+          message: oauthError.message,
+          type: 'danger',
+        });
+      }
+    } catch (err: any) {
+      showToast({
+        title: 'OAuth Error',
+        message: err?.message || 'Failed to initiate Google sign in.',
+        type: 'danger',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
