@@ -8,6 +8,7 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
@@ -17,6 +18,7 @@ export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   title,
+  description,
   children,
   footer,
   className,
@@ -51,17 +53,22 @@ export const Modal: React.FC<ModalProps> = ({
       {/* Modal Content container */}
       <div
         className={cn(
-          'relative z-10 w-full max-w-lg rounded-xl border border-border bg-surface text-text-primary p-6 shadow-2xl transition-all duration-300 animate-in fade-in zoom-in-95',
+          'relative z-10 w-full max-w-lg rounded-2xl border border-border bg-surface text-text-primary p-6 shadow-2xl transition-all duration-300 animate-in fade-in zoom-in-95',
           className
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
-          <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+        <div className="flex items-start justify-between border-b border-border pb-4 mb-4 gap-3">
+          <div>
+            <h2 className="text-lg font-bold tracking-tight text-text-primary">{title}</h2>
+            {description && (
+              <p className="text-xs text-text-muted mt-0.5 leading-relaxed">{description}</p>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors cursor-pointer"
+            className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors cursor-pointer shrink-0"
             aria-label="Close dialog"
           >
             <X className="h-5 w-5" />

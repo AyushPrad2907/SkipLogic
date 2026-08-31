@@ -4,12 +4,14 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/providers/ToastProvider';
 import { supabase } from '@/lib/supabase';
+import { saveStoredStudentName } from '@/lib/userProfile';
 
 export const Auth: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   
   const [isSignUp, setIsSignUp] = useState(false);
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +21,7 @@ export const Auth: React.FC = () => {
     e.preventDefault();
     setError(null);
 
-    if (!email || !password) {
+    if (!email || !password || (isSignUp && !fullName.trim())) {
       setError('Please fill in all fields.');
       return;
     }
@@ -33,9 +35,16 @@ export const Auth: React.FC = () => {
 
     try {
       if (isSignUp) {
+        saveStoredStudentName(fullName.trim());
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
           password,
+          options: {
+            data: {
+              full_name: fullName.trim(),
+              name: fullName.trim(),
+            },
+          },
         });
 
         if (signUpError) {
@@ -51,7 +60,7 @@ export const Auth: React.FC = () => {
         if (data.session) {
           showToast({
             title: 'Account Created',
-            message: 'Welcome to SkipLogic! Setting up your workspace.',
+            message: `Welcome to SkipLogic, ${fullName.trim()}!`,
             type: 'success',
           });
           navigate('/app/setup');
@@ -144,6 +153,24 @@ export const Auth: React.FC = () => {
             {error && (
               <div className="rounded-lg bg-danger/10 border border-danger/20 p-3 text-xs text-danger font-medium animate-in fade-in">
                 {error}
+              </div>
+            )}
+
+            {isSignUp && (
+              <div>
+                <label htmlFor="fullName" className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1">
+                  Student Full Name
+                </label>
+                <input
+                  id="fullName"
+                  type="text"
+                  placeholder="e.g. Ayush Pradhan"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full h-10 px-3 rounded-md border border-border bg-background text-text-primary text-sm focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition-colors"
+                  disabled={isLoading}
+                  required
+                />
               </div>
             )}
 

@@ -8,44 +8,101 @@ import {
   History,
   TrendingUp,
   Sparkles,
-  LogOut
+  LogOut,
+  Edit3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useToast } from '@/providers/ToastProvider';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
+import { getStoredStudentName, updateStudentName } from '@/lib/userProfile';
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [studentName, setStudentName] = useState<string>(() => getStoredStudentName() || 'Student');
   const [userEmail, setUserEmail] = useState<string>('guest@skiplogic.io');
-  const [userInitial, setUserInitial] = useState<string>('S');
+  const [userInitial, setUserInitial] = useState<string>(() => {
+    const stored = getStoredStudentName();
+    return stored ? stored.charAt(0).toUpperCase() : 'S';
+  });
+
+  const [isEditNameModalOpen, setIsEditNameModalOpen] = useState(false);
+  const [editNameInput, setEditNameInput] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
 
   useEffect(() => {
+    // Initial fetch from supabase or localStorage
     supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.email) {
-        setUserEmail(data.user.email);
-        setUserInitial(data.user.email.charAt(0).toUpperCase());
+      if (data?.user) {
+        if (data.user.email) setUserEmail(data.user.email);
+        const metaName = data.user.user_metadata?.full_name || data.user.user_metadata?.name;
+        const currentStored = getStoredStudentName();
+        const effectiveName = metaName || currentStored || '';
+        if (effectiveName) {
+          setStudentName(effectiveName);
+          setUserInitial(effectiveName.charAt(0).toUpperCase());
+        }
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user?.email) {
-        setUserEmail(session.user.email);
-        setUserInitial(session.user.email.charAt(0).toUpperCase());
-      } else {
-        setUserEmail('guest@skiplogic.io');
-        setUserInitial('G');
+      if (session?.user) {
+        if (session.user.email) setUserEmail(session.user.email);
+        const metaName = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
+        const currentStored = getStoredStudentName();
+        const effectiveName = metaName || currentStored || '';
+        if (effectiveName) {
+          setStudentName(effectiveName);
+          setUserInitial(effectiveName.charAt(0).toUpperCase());
+        }
       }
     });
 
+    // Listen for custom name changed events
+    const handleNameChanged = (e: CustomEvent<string>) => {
+      if (e.detail) {
+        setStudentName(e.detail);
+        setUserInitial(e.detail.charAt(0).toUpperCase());
+      }
+    };
+
+    window.addEventListener('skiplogic_name_changed' as any, handleNameChanged);
+
     return () => {
       subscription.unsubscribe();
+      window.removeEventListener('skiplogic_name_changed' as any, handleNameChanged);
     };
   }, []);
+
+  const handleSaveName = async () => {
+    if (!editNameInput.trim()) return;
+    setIsSavingName(true);
+    try {
+      const updated = await updateStudentName(editNameInput.trim());
+      setStudentName(updated);
+      setUserInitial(updated.charAt(0).toUpperCase());
+      showToast({
+        title: 'Name Updated',
+        message: `Your name is now set to ${updated}.`,
+        type: 'success',
+      });
+      setIsEditNameModalOpen(false);
+    } catch {
+      showToast({
+        title: 'Update Failed',
+        message: 'Could not update name.',
+        type: 'danger',
+      });
+    } finally {
+      setIsSavingName(false);
+    }
+  };
 
   const menuItems = [
     { label: 'Dashboard', path: '/app', icon: LayoutDashboard },
@@ -137,7 +194,7 @@ export const AppLayout: React.FC = () => {
                 {userInitial}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-text-primary truncate">Student Account</p>
+                <p className="text-sm font-bold text-text-primary truncate">{studentName}</p>
                 <p className="text-xs text-text-muted truncate font-mono">{userEmail}</p>
               </div>
             </button>
@@ -145,6 +202,17 @@ export const AppLayout: React.FC = () => {
             {/* Profile Dropdown Context Menu */}
             {profileOpen && (
               <div className="absolute bottom-full left-0 w-full mb-2 bg-surface/95 backdrop-blur-xl border border-border/80 rounded-xl shadow-2xl py-1.5 z-30 animate-in fade-in slide-in-from-bottom-2">
+                <button
+                  onClick={() => {
+                    setEditNameInput(studentName === 'Student' ? '' : studentName);
+                    setIsEditNameModalOpen(true);
+                    setProfileOpen(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary font-medium transition-colors flex items-center gap-2.5 cursor-pointer"
+                >
+                  <Edit3 className="h-4 w-4 text-brand" />
+                  Edit Name
+                </button>
                 <Link
                   to="/app/semester"
                   onClick={() => setProfileOpen(false)}
@@ -200,11 +268,22 @@ export const AppLayout: React.FC = () => {
           {profileOpen && (
             <div className="absolute top-14 right-4 w-60 bg-surface/95 backdrop-blur-2xl border border-border rounded-xl shadow-2xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-150">
               <div className="px-4 py-2.5 border-b border-border">
-                <p className="text-xs font-bold text-text-primary">Student Account</p>
+                <p className="text-xs font-bold text-text-primary">{studentName}</p>
                 <p className="text-[11px] font-mono text-text-muted truncate mt-0.5">{userEmail}</p>
               </div>
               
               <div className="py-1">
+                <button
+                  onClick={() => {
+                    setEditNameInput(studentName === 'Student' ? '' : studentName);
+                    setIsEditNameModalOpen(true);
+                    setProfileOpen(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-xs hover:bg-surface-elevated text-text-primary font-medium transition-colors flex items-center gap-2.5 cursor-pointer"
+                >
+                  <Edit3 className="h-4 w-4 text-brand" />
+                  Edit Name
+                </button>
                 <Link
                   to="/app/semester"
                   onClick={() => setProfileOpen(false)}
@@ -241,6 +320,49 @@ export const AppLayout: React.FC = () => {
             <Outlet />
           </ErrorBoundary>
         </main>
+
+        {/* Edit Student Name Modal */}
+        <Modal
+          isOpen={isEditNameModalOpen}
+          onClose={() => setIsEditNameModalOpen(false)}
+          title="Edit Student Name"
+          description="Your name is personalized on your command center, timetable, and attendance coach."
+        >
+          <div className="space-y-4 pt-2">
+            <div>
+              <label htmlFor="studentNameInput" className="block text-xs font-mono font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+                Your Name
+              </label>
+              <input
+                id="studentNameInput"
+                type="text"
+                placeholder="e.g. Ayush Pradhan"
+                value={editNameInput}
+                onChange={(e) => setEditNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                className="w-full h-11 px-4 rounded-xl border border-border bg-surface text-text-primary text-sm focus:outline-none focus:border-brand font-sans transition-colors"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => setIsEditNameModalOpen(false)}
+                disabled={isSavingName}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveName}
+                disabled={!editNameInput.trim() || isSavingName}
+                isLoading={isSavingName}
+              >
+                Save Name
+              </Button>
+            </div>
+          </div>
+        </Modal>
 
         {/* 3. MOBILE BOTTOM NAVIGATION (Fast, 5-core-item native feel) */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface/90 backdrop-blur-xl border-t border-border/80 flex items-center justify-around px-1 z-30 shadow-[0_-8px_20px_rgba(0,0,0,0.08)] pb-[max(env(safe-area-inset-bottom),0px)]">

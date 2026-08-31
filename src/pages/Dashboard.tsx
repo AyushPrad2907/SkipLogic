@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useAttendance } from '@/providers/AttendanceProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -18,6 +19,7 @@ import { SemesterForecastCard } from '@/components/dashboard/SemesterForecastCar
 import { WhatIfSimulatorCard } from '@/components/dashboard/WhatIfSimulatorCard';
 import { TimetableImporter } from '@/components/timetable/TimetableImporter';
 import { AttendanceImporter } from '@/components/subjects/AttendanceImporter';
+import { getStoredStudentName, updateStudentName } from '@/lib/userProfile';
 import { cn } from '@/lib/utils';
 import {
   Plus,
@@ -48,11 +50,59 @@ export const Dashboard: React.FC = () => {
   } = useDashboardData();
   const { showToast } = useToast();
 
+  const [studentName, setStudentName] = useState<string>(() => getStoredStudentName());
+  const [isNamePromptOpen, setIsNamePromptOpen] = useState(false);
+  const [promptNameInput, setPromptNameInput] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+
   const [submittingSlotId, setSubmittingSlotId] = useState<string | null>(null);
   const [isTimetableImporterOpen, setIsTimetableImporterOpen] = useState(false);
   const [isAttendanceImporterOpen, setIsAttendanceImporterOpen] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    const stored = getStoredStudentName();
+    if (!stored) {
+      setIsNamePromptOpen(true);
+    } else {
+      setStudentName(stored);
+    }
+
+    const handleNameChanged = (e: CustomEvent<string>) => {
+      if (e.detail) {
+        setStudentName(e.detail);
+      }
+    };
+
+    window.addEventListener('skiplogic_name_changed' as any, handleNameChanged);
+    return () => {
+      window.removeEventListener('skiplogic_name_changed' as any, handleNameChanged);
+    };
+  }, []);
+
+  const handleSaveInitialName = async () => {
+    if (!promptNameInput.trim()) return;
+    setIsSavingName(true);
+    try {
+      const saved = await updateStudentName(promptNameInput.trim());
+      setStudentName(saved);
+      showToast({
+        title: `Welcome, ${saved}!`,
+        message: 'Your personal attendance command center is ready.',
+        type: 'success',
+      });
+      setIsNamePromptOpen(false);
+    } catch {
+      showToast({
+        title: 'Error Saving Name',
+        message: 'Could not save your name.',
+        type: 'danger',
+      });
+    } finally {
+      setIsSavingName(false);
+    }
+  };
 
   const handleLoadMock = () => {
     loadMockData();
@@ -144,7 +194,7 @@ export const Dashboard: React.FC = () => {
     return (
       <div>
         <PageHeader
-          title="Dashboard"
+          title={studentName ? `Hey ${studentName}! 👋` : "Dashboard"}
           description="Tactical attendance decision dashboard."
           actions={
             <Button onClick={handleLoadMock} variant="secondary" className="flex items-center gap-1 cursor-pointer">
@@ -188,8 +238,8 @@ export const Dashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Page Header & Quick Action Bar */}
       <PageHeader
-        title="Dashboard"
-        description="Attendance command center & tactical decision intelligence."
+        title={studentName ? `Hey ${studentName}! 👋` : "Dashboard"}
+        description="Welcome to your SkipLogic Attendance Command Center."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -359,6 +409,49 @@ export const Dashboard: React.FC = () => {
         isOpen={isAttendanceImporterOpen}
         onClose={() => setIsAttendanceImporterOpen(false)}
       />
+
+      {/* Welcome Name Prompt Modal */}
+      <Modal
+        isOpen={isNamePromptOpen}
+        onClose={() => setIsNamePromptOpen(false)}
+        title="Welcome to SkipLogic! 🚀"
+        description="What should we call you? We'll personalize your attendance command center and AI coach."
+      >
+        <div className="space-y-4 pt-2">
+          <div>
+            <label htmlFor="promptNameInput" className="block text-xs font-mono font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+              Your Name
+            </label>
+            <input
+              id="promptNameInput"
+              type="text"
+              placeholder="e.g. Ayush"
+              value={promptNameInput}
+              onChange={(e) => setPromptNameInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveInitialName()}
+              className="w-full h-11 px-4 rounded-xl border border-border bg-surface text-text-primary text-sm focus:outline-none focus:border-brand font-sans transition-colors"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setIsNamePromptOpen(false)}
+              disabled={isSavingName}
+            >
+              Skip for now
+            </Button>
+            <Button
+              onClick={handleSaveInitialName}
+              disabled={!promptNameInput.trim() || isSavingName}
+              isLoading={isSavingName}
+            >
+              Let's Go
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
