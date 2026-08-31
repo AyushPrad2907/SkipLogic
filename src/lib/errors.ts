@@ -58,8 +58,9 @@ export function sanitizeErrorMessage(message: string): string {
   // Redact file paths (C:\Users\..., /home/..., /Users/...)
   sanitized = sanitized.replace(/([A-Z]:\\[^\s:]+|\/(?:Users|home|var|usr)[^\s:]+)/gi, '[REDACTED_FILE_PATH]');
 
-  // Redact SQL queries and database error details
-  if (sanitized.includes('PGRST') || sanitized.includes('postgres') || sanitized.includes('relation "') || sanitized.includes('SELECT') || sanitized.includes('INSERT')) {
+  // Redact SQL queries, DDL/DML statements, and database error details
+  const sqlPattern = /\b(PGRST|postgres|relation\s+"|SELECT\s|INSERT\s|DROP\s|UPDATE\s|DELETE\s|ALTER\s|TRUNCATE\s)/i;
+  if (sqlPattern.test(sanitized)) {
     sanitized = 'A database query error occurred. Please try again.';
   }
 
