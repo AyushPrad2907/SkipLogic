@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
+import { useToast } from '@/providers/ToastProvider';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useAnalyticsData } from '@/hooks/useAnalyticsData';
 import { buildCoachContext } from '@/lib/ai/coachContext';
@@ -18,6 +20,8 @@ import {
   Bot,
   User,
   RefreshCw,
+  Key,
+  Cpu,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +48,7 @@ export const AIAttendanceCoach: React.FC = () => {
   const { viewModel: dashboard } = useDashboardData();
   const { subjects, timetable, settings, holidays } = useAttendance();
   const { viewModel: analytics } = useAnalyticsData();
+  const { showToast } = useToast();
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -56,6 +61,9 @@ export const AIAttendanceCoach: React.FC = () => {
 
   const [inputQuestion, setInputQuestion] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => localStorage.getItem('skiplogic_gemini_api_key') || '');
+  const [hasApiKey, setHasApiKey] = useState(() => Boolean(localStorage.getItem('skiplogic_gemini_api_key')));
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -123,6 +131,28 @@ export const AIAttendanceCoach: React.FC = () => {
     ]);
   };
 
+  const handleSaveApiKey = () => {
+    const trimmed = apiKeyInput.trim();
+    if (trimmed) {
+      localStorage.setItem('skiplogic_gemini_api_key', trimmed);
+      setHasApiKey(true);
+      showToast({
+        title: 'Gemini API Key Saved',
+        message: 'AI Attendance Coach is now powered by Google Gemini.',
+        type: 'success',
+      });
+    } else {
+      localStorage.removeItem('skiplogic_gemini_api_key');
+      setHasApiKey(false);
+      showToast({
+        title: 'Key Removed',
+        message: 'Switched to SkipLogic Precision Mathematical Engine.',
+        type: 'info',
+      });
+    }
+    setIsKeyModalOpen(false);
+  };
+
   return (
     <Card variant="glass" className="p-0 border-border/80 overflow-hidden flex flex-col h-[650px] shadow-2xl">
       {/* 1. Header */}
@@ -135,7 +165,7 @@ export const AIAttendanceCoach: React.FC = () => {
             <div className="flex items-center gap-2">
               <h3 className="text-base font-black tracking-tight text-text-primary">AI Attendance Coach</h3>
               <Badge variant="safe" className="text-[9px] font-mono py-0.5 px-2 font-bold uppercase">
-                FACT-CHECKED
+                {hasApiKey ? 'GEMINI 2.5 ACTIVE' : 'FACT-CHECKED'}
               </Badge>
             </div>
             <p className="text-xs text-text-muted">
@@ -144,14 +174,27 @@ export const AIAttendanceCoach: React.FC = () => {
           </div>
         </div>
 
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleClearHistory}
-          className="text-xs text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer rounded-xl"
-        >
-          <Trash2 className="h-3.5 w-3.5" /> Clear
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsKeyModalOpen(true)}
+            className="text-xs text-text-secondary hover:text-text-primary flex items-center gap-1.5 cursor-pointer rounded-xl"
+            title="Configure AI Engine / API Key"
+          >
+            {hasApiKey ? <Key className="h-3.5 w-3.5 text-brand" /> : <Cpu className="h-3.5 w-3.5 text-safe" />}
+            <span className="hidden sm:inline font-mono text-[11px]">{hasApiKey ? 'Gemini AI' : 'Math Engine'}</span>
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleClearHistory}
+            className="text-xs text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer rounded-xl"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Clear
+          </Button>
+        </div>
       </div>
 
       {/* 2. Messages List */}
@@ -305,8 +348,75 @@ export const AIAttendanceCoach: React.FC = () => {
           <ShieldCheck className="h-3.5 w-3.5 text-safe" />
           Read-Only AI: Cannot modify attendance logs or subjects.
         </span>
-        <span>SkipLogic Phase 14 AI Engine</span>
+        <span>SkipLogic Intelligence Engine</span>
       </div>
+
+      {/* API Key Configuration Modal */}
+      <Modal
+        isOpen={isKeyModalOpen}
+        onClose={() => setIsKeyModalOpen(false)}
+        title="AI Attendance Coach Engine"
+        description="SkipLogic uses a built-in precision mathematical reasoning engine by default. You can also connect a free Google Gemini API Key for conversational cloud AI."
+      >
+        <div className="space-y-4 pt-2">
+          <div>
+            <label htmlFor="geminiKey" className="block text-xs font-mono font-bold text-text-secondary uppercase tracking-wider mb-1.5">
+              Google Gemini API Key (Optional)
+            </label>
+            <input
+              id="geminiKey"
+              type="password"
+              placeholder="AIzaSy..."
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              className="w-full h-11 px-4 rounded-xl border border-border bg-surface text-text-primary text-xs font-mono focus:outline-none focus:border-brand transition-colors"
+            />
+            <p className="text-[11px] text-text-muted mt-1.5 leading-relaxed">
+              Get a free Gemini API key from{' '}
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-brand hover:underline font-bold"
+              >
+                Google AI Studio
+              </a>
+              . If left blank, SkipLogic's built-in precision math engine handles all your queries automatically.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            {hasApiKey ? (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => {
+                  setApiKeyInput('');
+                  localStorage.removeItem('skiplogic_gemini_api_key');
+                  setHasApiKey(false);
+                  setIsKeyModalOpen(false);
+                  showToast({
+                    title: 'Switched to Built-in Engine',
+                    message: 'Using SkipLogic precision math reasoning.',
+                    type: 'info',
+                  });
+                }}
+              >
+                Use Built-in Engine
+              </Button>
+            ) : <div />}
+
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => setIsKeyModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveApiKey}>
+                Save Configuration
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </Card>
   );
 };
