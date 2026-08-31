@@ -80,28 +80,56 @@ export function parseCombinedCellText(text: string): {
   subjectName = extracted.name;
   subjectCode = extracted.code;
 
-  // Check remaining lines or tokens for Component, Room, Instructor
+  // Check if first line contains parenthesized or trailing component like "(PR)" or "(PP)" or "(TUT)"
+  const compInFirstLine = firstLine.match(/\((PP|PR|TUT|LAB|THEORY|LECTURE|PRACTICAL|TUTORIAL)\)/i) ||
+                          firstLine.match(/\b(PP|PR|TUT|LAB|THEORY|LECTURE|PRACTICAL|TUTORIAL)\b/i);
+  if (compInFirstLine) {
+    const comp = normalizeComponent(compInFirstLine[1]);
+    componentName = comp.name;
+    componentType = comp.type;
+    // Clean component marker from subject name
+    subjectName = subjectName
+      .replace(/\((PP|PR|TUT|LAB|THEORY|LECTURE|PRACTICAL|TUTORIAL)\)/gi, '')
+      .replace(/\b(PP|PR|TUT|LAB|THEORY|LECTURE|PRACTICAL|TUTORIAL)\b/gi, '')
+      .replace(/^[-:\s()|]+|[-:\s()|]+$/g, '')
+      .trim();
+  }
+
+  // Check remaining lines or tokens for Subject Code, Component, Room, Instructor
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
 
-    // Component check
+    // 1. Subject code check (if not yet found on line 0, e.g. "CUTM1018" or "CUCS1002")
+    if (!subjectCode) {
+      const codeMatch = line.match(/\b([A-Z]{2,6}[ -]?[0-9]{3,5}[A-Z]?)\b/i);
+      if (codeMatch) {
+        subjectCode = codeMatch[1].replace(/\s+/g, '').toUpperCase();
+        continue;
+      }
+    }
+
+    // 2. Component check
     if (!componentName && /(PP|PR|TUT|LAB|THEORY|LECTURE|PRACTICAL|TUTORIAL)/i.test(line)) {
       const comp = normalizeComponent(line);
       componentName = comp.name;
       componentType = comp.type;
     }
 
-    // Room check (e.g. AR-402, LHC101, Room 12, Lab 3, Hall B)
-    if (!room && /(ROOM|HALL|LAB|LHC|CLASS|[A-Z]{1,3}[- ]?\d{2,4})/i.test(line) && !/Prof|Dr|Faculty|Teacher/i.test(line)) {
+    // 3. Room check (e.g. AR-402, LHC101, Room 12, Lab 3, Hall B, SWIMMING)
+    if (!room && (/(ROOM|HALL|LAB|LHC|CLASS|[A-Z]{1,4}[- ]?\d{2,4}|SWIMMING|AUDITORIUM)/i.test(line)) && !/Prof|Dr|Faculty|Teacher/i.test(line)) {
       room = line
         .replace(/^(PP|PR|TUT|LAB|THEORY|LECTURE|PRACTICAL)\s*[-:]?\s*/i, '')
         .replace(/^[-:\s()|]+|[-:\s()|]+$/g, '')
         .trim();
     }
 
-    // Faculty check (e.g. Prof. X, Dr. Y, Mr. Z, Ms. W)
-    if (!instructor && /(PROF|DR|MR|MS|FACULTY|INSTRUCTOR|TEACHER|[A-Z]\.\s*[A-Z])/i.test(line)) {
-      instructor = line.replace(/^[-:\s()|]+|[-:\s()|]+$/g, '').trim();
+    // 4. Faculty / Instructor check
+    if (!instructor && !room?.includes(line)) {
+      if (/(PROF|DR|MR|MS|FACULTY|INSTRUCTOR|TEACHER|[A-Z]\.\s*[A-Z])/i.test(line)) {
+        instructor = line.replace(/^[-:\s()|]+|[-:\s()|]+$/g, '').trim();
+      } else if (/^[A-Za-z\s.'-]+$/.test(line) && line.split(/\s+/).length >= 2 && !/(ROOM|HALL|LAB|LHC|CLASS|SWIMMING|AUDITORIUM)/i.test(line)) {
+        instructor = line.trim();
+      }
     }
   }
 
@@ -113,7 +141,7 @@ export function parseCombinedCellText(text: string): {
   }
 
   return {
-    subjectName,
+    subjectName: subjectName || extracted.name,
     subjectCode,
     componentName,
     componentType,
