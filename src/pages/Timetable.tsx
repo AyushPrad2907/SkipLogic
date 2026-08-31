@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { TacticalLoader } from '@/components/ui/Loading';
 import { TimetableImporter } from '@/components/timetable/TimetableImporter';
 import { Calendar, Plus, Trash2, Clock, MapPin, User, Edit2, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 import { DayOfWeek, TimetableSlot } from '@/types';
@@ -259,10 +260,15 @@ export const Timetable: React.FC = () => {
       />
 
       {isLoading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          <Skeleton className="h-64 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex items-center justify-center py-8">
+            <TacticalLoader message="Rendering Weekly Timetable Matrix..." size="md" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            <Skeleton className="h-64 rounded-2xl" />
+            <Skeleton className="h-64 rounded-2xl" />
+            <Skeleton className="h-64 rounded-2xl" />
+          </div>
         </div>
       ) : timetable.length === 0 ? (
         <div className="py-12">

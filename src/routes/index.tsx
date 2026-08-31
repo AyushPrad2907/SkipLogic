@@ -18,14 +18,12 @@ const AttendanceHistory = lazy(() => import('@/pages/AttendanceHistory').then((m
 const Analytics = lazy(() => import('@/pages/Analytics').then((m) => ({ default: m.Analytics })));
 const CoachPage = lazy(() => import('@/pages/Coach').then((m) => ({ default: m.CoachPage })));
 
-const RouteLoadingSpinner = () => (
-  <div className="flex items-center justify-center p-12 w-full min-h-[40vh]">
-    <div className="animate-spin rounded-full h-8 w-8 border-2 border-brand border-t-transparent" />
-  </div>
-);
+import { PageLoader } from '@/components/ui/Loading';
 
 const renderWithSuspense = (Element: React.ReactElement) => (
-  <Suspense fallback={<RouteLoadingSpinner />}>{Element}</Suspense>
+  <Suspense fallback={<PageLoader message="Synchronizing SkipLogic intelligence..." />}>
+    {Element}
+  </Suspense>
 );
 
 export const router = createBrowserRouter([

@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { TacticalLoader } from '@/components/ui/Loading';
 import { AnalyticsOverview } from '@/components/analytics/AnalyticsOverview';
 import { AttendanceTrendChart } from '@/components/analytics/AttendanceTrendChart';
 import { SubjectAnalyticsCard } from '@/components/analytics/SubjectAnalyticsCard';
@@ -38,11 +39,14 @@ export const Analytics: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in duration-300">
         <PageHeader title="Attendance Analytics" description="Calculating historical progression..." />
+        <div className="flex items-center justify-center py-8">
+          <TacticalLoader message="Crunching Subject Analytics & Trends..." size="md" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Skeleton className="h-32 col-span-4 rounded-xl" />
-          <Skeleton className="h-64 col-span-4 rounded-xl" />
+          <Skeleton className="h-36 col-span-4 rounded-2xl" />
+          <Skeleton className="h-72 col-span-4 rounded-2xl" />
         </div>
       </div>
     );

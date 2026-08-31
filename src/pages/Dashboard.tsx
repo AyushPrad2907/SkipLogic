@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { TacticalLoader } from '@/components/ui/Loading';
 import { DecisionCard } from '@/components/dashboard/DecisionCard';
 import { OverallCommandCenter } from '@/components/dashboard/OverallCommandCenter';
 import { SubjectRiskOverview } from '@/components/dashboard/SubjectRiskOverview';
@@ -109,12 +110,15 @@ export const Dashboard: React.FC = () => {
   // 1. Loading State
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in duration-300">
         <PageHeader title="Dashboard" description="Loading attendance intelligence command center..." />
+        <div className="flex items-center justify-center py-8">
+          <TacticalLoader message="Evaluating Attendance Trajectories..." subMessage="Synchronizing timetable calculations" size="md" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-40 col-span-3 rounded-xl" />
-          <Skeleton className="h-48 col-span-2 rounded-xl" />
-          <Skeleton className="h-48 col-span-1 rounded-xl" />
+          <Skeleton className="h-44 col-span-3 rounded-2xl" />
+          <Skeleton className="h-48 col-span-2 rounded-2xl" />
+          <Skeleton className="h-48 col-span-1 rounded-2xl" />
         </div>
       </div>
     );

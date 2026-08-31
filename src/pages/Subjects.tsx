@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { TacticalLoader } from '@/components/ui/Loading';
 import { AttendanceImporter } from '@/components/subjects/AttendanceImporter';
 import { BookOpen, Plus, FileSpreadsheet } from 'lucide-react';
 
@@ -126,10 +127,15 @@ export const Subjects: React.FC = () => {
       />
 
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex items-center justify-center py-8">
+            <TacticalLoader message="Loading Subjects & Components..." size="md" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Skeleton className="h-48 rounded-2xl" />
+            <Skeleton className="h-48 rounded-2xl" />
+            <Skeleton className="h-48 rounded-2xl" />
+          </div>
         </div>
       ) : subjects.length === 0 ? (
         <div className="py-12">

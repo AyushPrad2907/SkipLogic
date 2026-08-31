@@ -11,7 +11,40 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
   <body class="bg-background text-text-primary antialiased selection:bg-safe/20 selection:text-safe-foreground min-h-screen">
-    <div id="root"></div>
+    <div id="root">
+      <div id="app-startup-splash" style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #090d16; color: #f8fafc; font-family: 'Inter', -apple-system, sans-serif; z-index: 9999; user-select: none;">
+        <!-- Glowing Radar Orb -->
+        <div style="position: relative; width: 84px; height: 84px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px;">
+          <!-- Ambient Glow -->
+          <div style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(99,102,241,0.45) 0%, rgba(99,102,241,0) 70%); filter: blur(14px);"></div>
+          <!-- Orbit Ring 1 (Dashed Outer) -->
+          <div style="position: absolute; width: 84px; height: 84px; border-radius: 50%; border: 1.5px dashed rgba(129, 140, 248, 0.45); animation: splash-spin 8s linear infinite;"></div>
+          <!-- Orbit Ring 2 (Gradient Radar Sweep) -->
+          <div style="position: absolute; width: 58px; height: 58px; border-radius: 50%; border: 2.5px solid transparent; border-top-color: #818cf8; border-right-color: #c084fc; animation: splash-spin 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite reverse;"></div>
+          <!-- Radar Center Core (Glowing Pulse) -->
+          <div style="width: 16px; height: 16px; border-radius: 50%; background: linear-gradient(135deg, #818cf8, #a855f7); box-shadow: 0 0 20px rgba(129, 140, 248, 0.95); animation: splash-pulse 1.5s ease-in-out infinite;"></div>
+        </div>
+
+        <!-- Brand Name -->
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 900; letter-spacing: -0.04em; background: linear-gradient(135deg, #818cf8, #c084fc, #e879f9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px;">
+          SkipLogic
+        </div>
+
+        <!-- Tactical Status Text -->
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em; color: #94a3b8; animation: splash-pulse 2s ease-in-out infinite; text-align: center; padding: 0 16px;">
+          Calibrating Attendance Trajectories...
+        </div>
+      </div>
+      <style>
+        @keyframes splash-spin {
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes splash-pulse {
+          0%, 100% { opacity: 0.6; transform: scale(0.96); }
+          50% { opacity: 1; transform: scale(1.04); }
+        }
+      </style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

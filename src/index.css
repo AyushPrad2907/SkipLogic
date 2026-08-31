@@ -149,3 +149,9 @@ body {
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
