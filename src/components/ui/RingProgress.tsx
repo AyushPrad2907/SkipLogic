@@ -34,23 +34,23 @@ export const RingProgress: React.FC<RingProgressProps> = ({
 
   // Determine status color
   const statusColors = {
-    SAFE: 'text-safe stroke-safe',
-    RISKY: 'text-risk stroke-risk',
-    MUST_ATTEND: 'text-danger stroke-danger',
-    NEUTRAL: 'text-brand stroke-brand',
+    SAFE: 'text-safe stroke-safe drop-shadow-[0_0_8px_rgba(0,245,160,0.4)]',
+    RISKY: 'text-risk stroke-risk drop-shadow-[0_0_8px_rgba(255,184,0,0.4)]',
+    MUST_ATTEND: 'text-danger stroke-danger drop-shadow-[0_0_8px_rgba(255,51,102,0.4)]',
+    NEUTRAL: 'text-brand stroke-brand drop-shadow-[0_0_8px_rgba(0,210,255,0.4)]',
   };
 
   const colorClass = statusColors[status] || statusColors.NEUTRAL;
 
   return (
-    <div className={cn('relative flex flex-col items-center justify-center', className)}>
+    <div className={cn('relative flex flex-col items-center justify-center select-none', className)}>
       <svg width={sizePx} height={sizePx} className="rotate-[-90deg]">
-        {/* Track circle */}
+        {/* Ambient Track circle */}
         <circle
           cx={sizePx / 2}
           cy={sizePx / 2}
           r={radius}
-          className="stroke-border fill-transparent"
+          className="stroke-border/70 fill-transparent"
           strokeWidth={strokeWidth}
         />
         {/* Animated indicator circle */}
@@ -69,16 +69,16 @@ export const RingProgress: React.FC<RingProgressProps> = ({
       <div className="absolute flex flex-col items-center justify-center text-center">
         <span
           className={cn(
-            'font-mono font-bold text-text-primary',
+            'font-mono font-black tracking-tight text-text-primary',
             size === 'sm' && 'text-xs',
-            size === 'md' && 'text-lg',
+            size === 'md' && 'text-xl',
             size === 'lg' && 'text-3xl'
           )}
         >
           {label || `${safeValue.toFixed(1)}%`}
         </span>
         {subLabel && size !== 'sm' && (
-          <span className="text-[10px] text-text-muted mt-0.5 uppercase tracking-wider">
+          <span className="text-[10px] text-text-muted font-mono font-semibold uppercase tracking-widest mt-0.5">
             {subLabel}
           </span>
         )}

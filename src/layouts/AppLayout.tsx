@@ -105,14 +105,17 @@ export const AppLayout: React.FC = () => {
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-surface shrink-0 h-screen sticky top-0">
         
         {/* Brand Header */}
-        <div className="p-6 border-b border-border flex items-center justify-between">
-          <Link to="/app" className="flex items-center gap-2">
-            <span className="font-mono font-black text-2xl tracking-tight bg-gradient-to-r from-brand to-indigo-400 bg-clip-text text-transparent">
+        <div className="p-6 border-b border-border/80 flex items-center justify-between">
+          <Link to="/app" className="flex items-center gap-2.5 group">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-brand to-sky-400 flex items-center justify-center text-background shadow-[0_0_15px_rgba(0,210,255,0.35)] group-hover:scale-105 transition-transform duration-200">
+              <Sparkles className="h-4 w-4 text-background" />
+            </div>
+            <span className="font-mono font-black text-2xl tracking-tight bg-gradient-to-r from-brand via-sky-400 to-indigo-400 bg-clip-text text-transparent">
               SkipLogic
             </span>
           </Link>
-          <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
-            PRO
+          <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-md bg-brand/15 text-brand border border-brand/30 shadow-xs">
+            RADAR
           </span>
         </div>
 
@@ -126,13 +129,13 @@ export const AppLayout: React.FC = () => {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors select-none',
+                  'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 select-none active:scale-98',
                   isActive
-                    ? 'bg-brand text-white shadow-sm'
+                    ? 'bg-brand text-background font-bold shadow-[0_0_16px_rgba(0,210,255,0.25)] border border-brand/50'
                     : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
                 )}
               >
-                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-text-secondary')} />
+                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-background' : 'text-text-muted')} />
                 {item.label}
               </Link>
             );

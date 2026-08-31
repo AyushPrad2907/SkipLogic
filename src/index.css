@@ -5,65 +5,65 @@
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    /* Light Theme Palette */
-    --background: #f8fafc;
+    /* Light Theme: Swiss Alpine Mist & Deep Cobalt */
+    --background: #f4f6f9;
     --surface: #ffffff;
-    --surface-elevated: #f1f5f9;
-    --surface-hover: #e2e8f0;
+    --surface-elevated: #f0f3f8;
+    --surface-hover: #e4e9f2;
     --border: #e2e8f0;
     --border-subtle: #edf2f7;
 
-    --text-primary: #0f172a;
+    --text-primary: #090d16;
     --text-secondary: #475569;
-    --text-muted: #94a3b8;
+    --text-muted: #8492a6;
 
     /* Semantic Tactical Tokens */
     --safe: #059669;
-    --safe-muted: rgba(5, 150, 105, 0.12);
+    --safe-muted: rgba(5, 150, 105, 0.1);
     --safe-foreground: #065f46;
 
     --risk: #d97706;
-    --risk-muted: rgba(217, 119, 6, 0.12);
+    --risk-muted: rgba(217, 119, 6, 0.1);
     --risk-foreground: #92400e;
 
     --danger: #dc2626;
-    --danger-muted: rgba(220, 38, 38, 0.12);
+    --danger-muted: rgba(220, 38, 38, 0.1);
     --danger-foreground: #991b1b;
 
-    --brand: #6366f1;
-    --brand-muted: rgba(99, 102, 241, 0.12);
-    --brand-foreground: #4338ca;
+    --brand: #0284c7;
+    --brand-muted: rgba(2, 132, 199, 0.1);
+    --brand-foreground: #0369a1;
   }
 
   .dark {
-    /* Dark Tactical Interface Palette */
-    --background: #090d16;
-    --surface: #0f172a;
-    --surface-elevated: #1e293b;
-    --surface-hover: #273549;
-    --border: #1e293b;
-    --border-subtle: #141e33;
+    /* Dark Theme: Midnight Carbon & Laser Hyper-Cyan */
+    --background: #07090e;
+    --surface: #0d121d;
+    --surface-elevated: #141b2b;
+    --surface-hover: #1c263c;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.04);
 
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
     --text-muted: #64748b;
 
     /* Semantic Tactical Tokens */
-    --safe: #10b981;
-    --safe-muted: rgba(16, 185, 129, 0.15);
-    --safe-foreground: #34d399;
+    --safe: #00f5a0;
+    --safe-muted: rgba(0, 245, 160, 0.12);
+    --safe-foreground: #00f5a0;
 
-    --risk: #f59e0b;
-    --risk-muted: rgba(245, 158, 11, 0.15);
-    --risk-foreground: #fbbf24;
+    --risk: #ffb800;
+    --risk-muted: rgba(255, 184, 0, 0.12);
+    --risk-foreground: #ffb800;
 
-    --danger: #ef4444;
-    --danger-muted: rgba(239, 68, 68, 0.15);
-    --danger-foreground: #f87171;
+    --danger: #ff3366;
+    --danger-muted: rgba(255, 51, 102, 0.12);
+    --danger-foreground: #ff3366;
 
-    --brand: #818cf8;
-    --brand-muted: rgba(129, 140, 248, 0.15);
-    --brand-foreground: #a5b4fc;
+    --brand: #00d2ff;
+    --brand-muted: rgba(0, 210, 255, 0.12);
+    --brand-foreground: #38bdf8;
   }
 }
 
@@ -122,6 +122,20 @@ body {
 /* Fluid hardware accelerated rendering */
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Machined Glass Rim lighting on cards */
+.glass-card {
+  position: relative;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+.dark .glass-card {
+  background: linear-gradient(180deg, rgba(20, 27, 43, 0.6) 0%, rgba(13, 18, 29, 0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
 }
 
 /* Custom scrollbars for tactical feel */
