@@ -124,22 +124,22 @@ export const AIAttendanceCoach: React.FC = () => {
   };
 
   return (
-    <Card className="p-0 border-border/80 overflow-hidden flex flex-col h-[650px] shadow-lg">
+    <Card variant="glass" className="p-0 border-border/80 overflow-hidden flex flex-col h-[650px] shadow-2xl">
       {/* 1. Header */}
-      <div className="p-4 bg-surface border-b border-border flex items-center justify-between">
+      <div className="p-4 bg-surface/90 border-b border-border/80 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-brand to-sky-400 flex items-center justify-center text-background shadow-[0_0_12px_rgba(0,210,255,0.3)]">
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-black text-text-primary">AI Attendance Coach</h3>
-              <Badge variant="safe" className="text-[9px] font-mono py-0 font-bold uppercase">
-                Fact-Checked
+              <h3 className="text-base font-black tracking-tight text-text-primary">AI Attendance Coach</h3>
+              <Badge variant="safe" className="text-[9px] font-mono py-0.5 px-2 font-bold uppercase">
+                FACT-CHECKED
               </Badge>
             </div>
             <p className="text-xs text-text-muted">
-              Explains your attendance facts powered by SkipLogic's decision engine.
+              Real-time attendance trajectory intelligence & bunk advisory.
             </p>
           </div>
         </div>
@@ -148,9 +148,9 @@ export const AIAttendanceCoach: React.FC = () => {
           variant="secondary"
           size="sm"
           onClick={handleClearHistory}
-          className="text-xs text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer"
+          className="text-xs text-text-muted hover:text-text-primary flex items-center gap-1.5 cursor-pointer rounded-xl"
         >
-          <Trash2 className="h-3.5 w-3.5" /> Clear Chat
+          <Trash2 className="h-3.5 w-3.5" /> Clear
         </Button>
       </div>
 
@@ -263,16 +263,16 @@ export const AIAttendanceCoach: React.FC = () => {
       </div>
 
       {/* 3. Quick Question Chips */}
-      <div className="p-3 bg-surface border-t border-border/60 overflow-x-auto flex items-center gap-2 no-scrollbar">
-        <span className="text-[10px] font-mono font-bold uppercase text-text-muted shrink-0 flex items-center gap-1">
-          <HelpCircle className="h-3 w-3" /> Quick Ask:
+      <div className="p-3 bg-surface/90 border-t border-border/80 overflow-x-auto flex items-center gap-2 no-scrollbar">
+        <span className="text-[10px] font-mono font-bold uppercase text-brand shrink-0 flex items-center gap-1">
+          <HelpCircle className="h-3.5 w-3.5 text-brand" /> Quick Ask:
         </span>
         {QUICK_QUESTIONS.map((q) => (
           <button
             key={q}
             onClick={() => handleSend(q)}
             disabled={isProcessing}
-            className="px-2.5 py-1 rounded-full bg-surface-elevated border border-border text-[11px] font-medium text-text-secondary hover:text-brand hover:border-brand/40 active:scale-95 transition-all duration-150 whitespace-nowrap cursor-pointer disabled:opacity-50 shrink-0"
+            className="px-3 py-1.5 rounded-xl bg-surface-elevated/80 border border-border text-[11px] font-medium text-text-secondary hover:text-brand hover:border-brand/40 active:scale-95 transition-all duration-150 whitespace-nowrap cursor-pointer disabled:opacity-50 shrink-0 shadow-2xs"
           >
             {q}
           </button>
@@ -280,7 +280,7 @@ export const AIAttendanceCoach: React.FC = () => {
       </div>
 
       {/* 4. Input Controls */}
-      <div className="p-3 bg-surface border-t border-border flex items-center gap-2">
+      <div className="p-3 bg-surface/90 border-t border-border flex items-center gap-2">
         <input
           type="text"
           value={inputQuestion}
@@ -288,12 +288,12 @@ export const AIAttendanceCoach: React.FC = () => {
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           placeholder="Ask a question about your attendance (e.g. Can I bunk tomorrow?)"
           disabled={isProcessing}
-          className="flex-1 h-10 px-3.5 rounded-lg border border-border bg-surface-elevated/40 text-text-primary text-xs focus:outline-none focus:border-brand font-sans"
+          className="flex-1 h-11 px-4 rounded-xl border border-border/80 bg-surface-elevated/60 text-text-primary text-xs focus:outline-none focus:border-brand font-sans placeholder:text-text-muted transition-colors"
         />
         <Button
           onClick={() => handleSend()}
           disabled={!inputQuestion.trim() || isProcessing}
-          className="h-10 px-4 flex items-center gap-1.5 cursor-pointer shrink-0"
+          className="h-11 px-5 flex items-center gap-2 cursor-pointer shrink-0 font-bold"
         >
           <Send className="h-4 w-4" /> Send
         </Button>

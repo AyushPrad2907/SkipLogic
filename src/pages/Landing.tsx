@@ -24,22 +24,22 @@ export const Landing: React.FC = () => {
       {/* Hero Section */}
       <section className="relative px-4 pt-20 pb-16 sm:px-6 md:pt-32 md:pb-24 max-w-7xl mx-auto">
         <div className="text-center">
-          <Badge variant="safe" className="mb-4 text-xs font-mono uppercase tracking-widest px-3 py-1">
-            Phase 1 Foundation Live
+          <Badge variant="safe" className="mb-4 text-xs font-mono uppercase tracking-widest px-3.5 py-1 shadow-[0_0_15px_rgba(0,245,160,0.2)]">
+            ✦ TACTICAL ATTENDANCE RADAR LIVE
           </Badge>
-          <h1 className="text-4xl font-extrabold tracking-tight text-text-primary sm:text-6xl md:text-7xl font-sans max-w-4xl mx-auto leading-[1.1]">
+          <h1 className="text-4xl font-black tracking-tight text-text-primary sm:text-6xl md:text-7xl font-sans max-w-4xl mx-auto leading-[1.08]">
             Don't guess.{' '}
-            <span className="bg-gradient-to-r from-brand to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-brand via-sky-400 to-indigo-400 bg-clip-text text-transparent">
               Know whether you can bunk.
             </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-base text-text-secondary sm:text-lg md:text-xl leading-relaxed">
-            Your attendance shouldn't be a guessing game. SkipLogic calculates exactly when you can skip, when you should attend, and how to recover when you're below the threshold.
+            Your attendance shouldn't be a guessing game. SkipLogic calculates mathematical safe bunks, class priority rankings, and rapid recovery roadmaps before every lecture.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link to="/app">
-              <Button size="lg" className="h-12 px-8 flex items-center gap-2 group cursor-pointer">
-                Get Started
+              <Button size="lg" className="h-12 px-8 flex items-center gap-2 group cursor-pointer font-bold shadow-[0_0_24px_rgba(0,210,255,0.35)]">
+                Launch Command Center
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
