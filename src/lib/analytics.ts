@@ -203,23 +203,34 @@ export function calculateSubjectAnalytics(
     new Date(parseLocalDateString(today).getTime() - (periodDays * 2 - 1) * 86400000)
   );
 
+  // Performance Optimization (Phase 17): Single-pass log partitioning by subject
+  const subjectPeriodMap = new Map<string, { currAtt: number; currDel: number; prevAtt: number; prevDel: number }>();
+  for (const l of logs) {
+    if (!l.subjectId) continue;
+    let entry = subjectPeriodMap.get(l.subjectId);
+    if (!entry) {
+      entry = { currAtt: 0, currDel: 0, prevAtt: 0, prevDel: 0 };
+      subjectPeriodMap.set(l.subjectId, entry);
+    }
+    if (l.date >= periodStart && l.date <= today) {
+      entry.currDel += 1;
+      if (l.status === 'ATTENDED') entry.currAtt += 1;
+    } else if (l.date >= prevPeriodStart && l.date < periodStart) {
+      entry.prevDel += 1;
+      if (l.status === 'ATTENDED') entry.prevAtt += 1;
+    }
+  }
+
   return subjects.map((sub) => {
-    const subLogs = logs.filter((l) => l.subjectId === sub.id);
+    const entry = subjectPeriodMap.get(sub.id) || { currAtt: 0, currDel: 0, prevAtt: 0, prevDel: 0 };
 
-    const currentPeriodLogs = subLogs.filter(
-      (l) => l.date >= periodStart && l.date <= today
-    );
-    const previousPeriodLogs = subLogs.filter(
-      (l) => l.date >= prevPeriodStart && l.date < periodStart
-    );
-
-    const periodAttended = currentPeriodLogs.filter((l) => l.status === 'ATTENDED').length;
-    const periodDelivered = currentPeriodLogs.length;
+    const periodAttended = entry.currAtt;
+    const periodDelivered = entry.currDel;
     const periodPctRaw = pct(periodAttended, periodDelivered);
     const periodPercentage = periodPctRaw !== null ? Number(periodPctRaw.toFixed(2)) : null;
 
-    const prevAttended = previousPeriodLogs.filter((l) => l.status === 'ATTENDED').length;
-    const prevDelivered = previousPeriodLogs.length;
+    const prevAttended = entry.prevAtt;
+    const prevDelivered = entry.prevDel;
     const prevPctRaw = pct(prevAttended, prevDelivered);
     const previousPeriodPercentage = prevPctRaw !== null ? Number(prevPctRaw.toFixed(2)) : null;
 
@@ -295,21 +306,37 @@ export function calculateComponentAnalytics(
     new Date(parseLocalDateString(today).getTime() - (periodDays * 2 - 1) * 86400000)
   );
 
+  // Performance Optimization (Phase 17): Single-pass log partitioning by component
+  const compPeriodMap = new Map<string, { currAtt: number; currDel: number; prevAtt: number; prevDel: number }>();
+  for (const l of logs) {
+    if (!l.componentId) continue;
+    let entry = compPeriodMap.get(l.componentId);
+    if (!entry) {
+      entry = { currAtt: 0, currDel: 0, prevAtt: 0, prevDel: 0 };
+      compPeriodMap.set(l.componentId, entry);
+    }
+    if (l.date >= periodStart && l.date <= today) {
+      entry.currDel += 1;
+      if (l.status === 'ATTENDED') entry.currAtt += 1;
+    } else if (l.date >= prevPeriodStart && l.date < periodStart) {
+      entry.prevDel += 1;
+      if (l.status === 'ATTENDED') entry.prevAtt += 1;
+    }
+  }
+
   const items: ComponentAnalyticsItem[] = [];
 
   for (const sub of subjects) {
     const comps = sub.components || [];
     for (const comp of comps) {
-      const compLogs = logs.filter((l) => l.componentId === comp.id);
-      const periodLogs = compLogs.filter((l) => l.date >= periodStart && l.date <= today);
-      const prevLogs = compLogs.filter((l) => l.date >= prevPeriodStart && l.date < periodStart);
+      const entry = compPeriodMap.get(comp.id) || { currAtt: 0, currDel: 0, prevAtt: 0, prevDel: 0 };
 
-      const periodAttended = periodLogs.filter((l) => l.status === 'ATTENDED').length;
-      const periodDelivered = periodLogs.length;
+      const periodAttended = entry.currAtt;
+      const periodDelivered = entry.currDel;
       const periodPct = pct(periodAttended, periodDelivered);
 
-      const prevAttended = prevLogs.filter((l) => l.status === 'ATTENDED').length;
-      const prevDelivered = prevLogs.length;
+      const prevAttended = entry.prevAtt;
+      const prevDelivered = entry.prevDel;
       const prevPct = pct(prevAttended, prevDelivered);
 
       const overallPctRaw = pct(comp.totalAttended, comp.totalDelivered);

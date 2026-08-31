@@ -158,9 +158,24 @@ export function walkFutureTimetable(params: TimetableWalkerParams): FutureClassO
     return [];
   }
 
-  const holidaySet = new Set(holidays.map((h) => h.trim()));
+  const holidaySet = new Set(
+    holidays.map((h: any) => (typeof h === 'string' ? h.trim() : (h?.date ? String(h.date).trim() : ''))).filter(Boolean)
+  );
   const workingSet = new Set(workingDays);
   const occurrences: FutureClassOccurrence[] = [];
+
+  // Performance Optimization (Phase 17): Pre-filter & pre-sort timetable slots by dayOfWeek
+  // Eliminates O(days * slots) filtering and repeated slot sorting on every iteration
+  const slotsByDay = new Map<DayOfWeek, TimetableSlotInput[]>();
+  for (const s of timetableSlots) {
+    if (subjectId && s.subjectId !== subjectId) continue;
+    const list = slotsByDay.get(s.dayOfWeek) || [];
+    list.push(s);
+    slotsByDay.set(s.dayOfWeek, list);
+  }
+  for (const list of slotsByDay.values()) {
+    list.sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
 
   const loopD = new Date(walkStartD);
   while (loopD <= endD) {
@@ -169,31 +184,25 @@ export function walkFutureTimetable(params: TimetableWalkerParams): FutureClassO
 
     // Check holiday exclusion & working day setting
     if (!holidaySet.has(dateStr) && workingSet.has(dayOfWeek)) {
-      // Find matching slots for this day of week
-      const matchingSlots = timetableSlots.filter((s) => {
-        if (s.dayOfWeek !== dayOfWeek) return false;
-        if (subjectId && s.subjectId !== subjectId) return false;
-        return true;
-      });
+      const matchingSlots = slotsByDay.get(dayOfWeek);
 
-      // Sort slots by start time
-      matchingSlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-      for (const slot of matchingSlots) {
-        occurrences.push({
-          id: `occ-${slot.id}-${dateStr}`,
-          date: dateStr,
-          dayOfWeek,
-          slotId: slot.id,
-          subjectId: slot.subjectId,
-          componentId: slot.componentId,
-          componentType: slot.componentType || 'PP',
-          componentName: slot.componentName || 'Theory',
-          startTime: slot.startTime,
-          endTime: slot.endTime,
-          room: slot.room,
-          faculty: slot.faculty,
-        });
+      if (matchingSlots && matchingSlots.length > 0) {
+        for (const slot of matchingSlots) {
+          occurrences.push({
+            id: `occ-${slot.id}-${dateStr}`,
+            date: dateStr,
+            dayOfWeek,
+            slotId: slot.id,
+            subjectId: slot.subjectId,
+            componentId: slot.componentId,
+            componentType: slot.componentType || 'PP',
+            componentName: slot.componentName || 'Theory',
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            room: slot.room,
+            faculty: slot.faculty,
+          });
+        }
       }
     }
 
