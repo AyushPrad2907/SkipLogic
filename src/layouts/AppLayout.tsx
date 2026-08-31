@@ -8,6 +8,7 @@ import {
   GraduationCap,
   History,
   TrendingUp,
+  Sparkles,
   LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ export const AppLayout: React.FC = () => {
 
   const menuItems = [
     { label: 'Dashboard', path: '/app', icon: LayoutDashboard },
+    { label: 'AI Coach', path: '/app/coach', icon: Sparkles },
     { label: 'Subjects', path: '/app/subjects', icon: BookOpen },
     { label: 'Timetable', path: '/app/timetable', icon: Calendar },
     { label: 'Analytics', path: '/app/analytics', icon: TrendingUp },

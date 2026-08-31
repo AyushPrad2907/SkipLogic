@@ -47,7 +47,8 @@ export interface TimetableSlot {
 
 export interface HolidayItem {
   id: string;
-  semesterId: string;
+  semesterId?: string;
+  semester_id?: string;
   date: string;
   name?: string | null;
 }

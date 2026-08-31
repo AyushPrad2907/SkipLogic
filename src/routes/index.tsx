@@ -11,6 +11,7 @@ import { Timetable } from '@/pages/Timetable';
 import { Semester } from '@/pages/Semester';
 import { AttendanceHistory } from '@/pages/AttendanceHistory';
 import { Analytics } from '@/pages/Analytics';
+import { CoachPage } from '@/pages/Coach';
 
 export const router = createBrowserRouter([
   // Marketing / Public Routes
@@ -60,6 +61,10 @@ export const router = createBrowserRouter([
       {
         path: 'analytics',
         element: <Analytics />,
+      },
+      {
+        path: 'coach',
+        element: <CoachPage />,
       },
       {
         path: 'semester',
