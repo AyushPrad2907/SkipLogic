@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as XLSX from 'xlsx';
-import { parseXlsxWorkbook, parseCombinedCellText } from './parser';
+import { parseXlsxWorkbook, parseCombinedCellText, parseWorksheet } from './parser';
 import {
   normalizeDayOfWeek,
   parseTimeRange,
@@ -529,5 +529,30 @@ describe('Phase 8: Intelligent XLSX Timetable Import Tests', () => {
     expect(result.slotsImported).toBe(1);
     expect(validSlots[0].matchedSubjectId).toBe('sub-ds-123');
     expect(validSlots[0].matchedComponentId).toBe('comp-ds-pp');
+  });
+
+  // TEST 21: Parses Collegiate Timetable with Vertical Days and Horizontal Times
+  it('TEST 21: Correctly parses matrix timetable with vertical days and horizontal times without phantom subjects', () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['WEEKLY TIMETABLE'],
+      [],
+      ['DAYS', '1st Period', '2nd Period', 'RECESS', '3rd Period'],
+      [null, '09:30-10:30', '10:30-11:30', '12:30-13:30', '13:30-14:30'],
+      ['Mon', 'DAV Python (PR)\nCUTM1018\nAR-402\nNaik Sanjib Kumar', '', 'RECESS', 'Job Readiness I (PR)\nCUTM0001\nAR-313\nProf A'],
+      ['Tue', 'Data Structures (PP)\nCUCS1002\nAR-215\nProf B', 'Data Structures (PP)\nCUCS1002\nAR-215\nProf B', 'RECESS', ''],
+    ]);
+
+    const extracted = parseWorksheet(ws, 'Weekly Timetable');
+    expect(extracted.length).toBe(4);
+    expect(extracted.some((s) => s.subjectName === 'DAYS' || s.subjectName === 'RECESS')).toBe(false);
+
+    const davSlot = extracted.find((s) => s.subjectName === 'DAV Python');
+    expect(davSlot).toBeDefined();
+    expect(davSlot?.dayOfWeek).toBe('MONDAY');
+    expect(davSlot?.startTime).toBe('09:30');
+    expect(davSlot?.endTime).toBe('10:30');
+    expect(davSlot?.subjectCode).toBe('CUTM1018');
+    expect(davSlot?.componentType).toBe('PR');
+    expect(davSlot?.room).toBe('AR-402');
   });
 });

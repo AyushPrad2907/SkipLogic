@@ -66,8 +66,19 @@ export function parseSingleTimeToMinutes(timeStr: string): number | null {
   if (!timeStr) return null;
 
   let s = timeStr.trim().toUpperCase();
+
+  // Reject strings that are period labels, ordinal numbers, or generic text
+  if (/PERIOD|DAYS|SLOT|CLASS|ROOM|SEM|RECESS|LUNCH|BREAK/i.test(s)) return null;
+  if (/^\d+(?:ST|ND|RD|TH)\b/i.test(s)) return null;
+
   const isPM = s.includes('PM');
   const isAM = s.includes('AM');
+  const hasColon = s.includes(':') || s.includes('.');
+
+  // If there's no colon and no AM/PM, require exact pure digits representing an hour (e.g. "9", "14")
+  if (!hasColon && !isAM && !isPM) {
+    if (!/^\d{1,2}$/.test(s)) return null;
+  }
 
   s = s.replace(/(AM|PM)/gi, '').trim();
   const parts = s.split(/[:.]/).map((p) => parseInt(p, 10));
@@ -113,6 +124,11 @@ export function parseTimeRange(
   const str = (startTimeInput || '').toString().trim();
   if (!str) return { startTime: null, endTime: null };
 
+  // Reject generic non-time headers
+  if (/^(DAYS|DAY|PERIOD|PERIODS|SLOT|SLOTS|RECESS|LUNCH|BREAK|FREE|LEGEND)/i.test(str)) {
+    return { startTime: null, endTime: null };
+  }
+
   // Check if string contains a range separator ("-", "TO", "TIL", "UNTIL", "–")
   const rangeMatch = str.split(/[-–—]|(?:\s+TO\s+)/i);
   if (rangeMatch.length >= 2) {
@@ -131,9 +147,13 @@ export function parseTimeRange(
   const startMins = parseSingleTimeToMinutes(str);
   let endMins = endTimeInput ? parseSingleTimeToMinutes(endTimeInput.toString()) : null;
 
-  // If no end time given, default to 1 hour after start
+  // If no end time given, only consider it a time if it has colon or AM/PM
   if (startMins !== null && endMins === null) {
-    endMins = startMins + 60;
+    if (str.includes(':') || str.includes('.') || /AM|PM/i.test(str)) {
+      endMins = startMins + 60;
+    } else {
+      return { startTime: null, endTime: null };
+    }
   }
 
   return {

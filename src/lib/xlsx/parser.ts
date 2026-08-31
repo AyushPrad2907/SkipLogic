@@ -281,23 +281,56 @@ export function parseWorksheet(
     return results;
   }
 
-  // Determine if Days are in a Header Row (Horizontal) and Times are in a Header Column (Vertical)
+  // Determine orientation
   const isDaysHorizontal = dayHeaderCells.every((d) => d.r === dayHeaderCells[0].r);
   const isTimesVertical = timeHeaderCells.every((t) => t.c === timeHeaderCells[0].c);
+
+  const isDaysVertical = dayHeaderCells.every((d) => d.c === dayHeaderCells[0].c);
+  const isTimesHorizontal = timeHeaderCells.every((t) => t.r === timeHeaderCells[0].r);
+
+  const isIgnoredKeyword = (text: string) =>
+    /^(DAYS|DAY|TIME|TIMING|PERIOD|PERIODS|SLOT|SLOTS|RECESS|LUNCH|BREAK|FREE|LEGEND)$/i.test(text.trim());
 
   if (isDaysHorizontal && isTimesVertical) {
     for (const timeCell of timeHeaderCells) {
       for (const dayCell of dayHeaderCells) {
         const cellVal = matrix[timeCell.r]?.[dayCell.c];
         if (!cellVal || cellVal.trim().length === 0) continue;
-
-        // Skip if the cell is just repeating day or time text
         if (normalizeDayOfWeek(cellVal) || parseTimeRange(cellVal, null).startTime) continue;
+        if (isIgnoredKeyword(cellVal)) continue;
 
         const cellRef = XLSX.utils.encode_cell({ r: timeCell.r, c: dayCell.c });
         const parsed = parseCombinedCellText(cellVal);
 
-        if (parsed.subjectName) {
+        if (parsed.subjectName && !isIgnoredKeyword(parsed.subjectName)) {
+          results.push({
+            dayOfWeek: dayCell.day,
+            startTime: timeCell.startTime,
+            endTime: timeCell.endTime || null,
+            subjectName: parsed.subjectName,
+            subjectCode: parsed.subjectCode,
+            componentName: parsed.componentName || 'Theory',
+            componentType: parsed.componentType || 'PP',
+            room: parsed.room,
+            instructor: parsed.instructor,
+            sourceSheet: sheetName,
+            sourceCell: cellRef,
+          });
+        }
+      }
+    }
+  } else if (isDaysVertical && isTimesHorizontal) {
+    for (const dayCell of dayHeaderCells) {
+      for (const timeCell of timeHeaderCells) {
+        const cellVal = matrix[dayCell.r]?.[timeCell.c];
+        if (!cellVal || typeof cellVal !== 'string' || cellVal.trim().length === 0) continue;
+        if (normalizeDayOfWeek(cellVal) || parseTimeRange(cellVal, null).startTime) continue;
+        if (isIgnoredKeyword(cellVal)) continue;
+
+        const cellRef = XLSX.utils.encode_cell({ r: dayCell.r, c: timeCell.c });
+        const parsed = parseCombinedCellText(cellVal);
+
+        if (parsed.subjectName && !isIgnoredKeyword(parsed.subjectName)) {
           results.push({
             dayOfWeek: dayCell.day,
             startTime: timeCell.startTime,
@@ -321,16 +354,17 @@ export function parseWorksheet(
         const cellVal = matrix[r][c];
         if (!cellVal || cellVal.trim().length === 0) continue;
         if (normalizeDayOfWeek(cellVal) || parseTimeRange(cellVal, null).startTime) continue;
+        if (isIgnoredKeyword(cellVal)) continue;
 
-        // Find matching day in same column or row
-        const matchedDay = dayHeaderCells.find((d) => d.c === c || d.r === r);
-        const matchedTime = timeHeaderCells.find((t) => t.r === r || t.c === c);
+        // Find matching day in same row/col and matching time in corresponding col/row
+        const matchedDay = dayHeaderCells.find((d) => d.r === r || d.c === c);
+        const matchedTime = timeHeaderCells.find((t) => t.c === c || t.r === r);
 
         if (matchedDay && matchedTime) {
           const cellRef = XLSX.utils.encode_cell({ r, c });
           const parsed = parseCombinedCellText(cellVal);
 
-          if (parsed.subjectName) {
+          if (parsed.subjectName && !isIgnoredKeyword(parsed.subjectName)) {
             results.push({
               dayOfWeek: matchedDay.day,
               startTime: matchedTime.startTime,
