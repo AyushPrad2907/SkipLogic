@@ -301,7 +301,7 @@ describe('Phase 14: AI Attendance Coach Comprehensive Test Suite', () => {
     const ctx = buildCoachContext(sampleDashboard, sampleAnalytics, sampleSubjects, sampleTimetable, sampleSettings, sampleHolidays);
     const res = await processCoachRequest('Can I bunk tomorrow?', ctx);
     expect(res.confidence).toBe('LOW');
-    expect(res.answer).toContain('AI Coach is temporarily unavailable');
+    expect(res.answer).toContain('AI Attendance Coach is temporarily unavailable');
   });
 
   // TEST 17: Gemini rate-limit handling

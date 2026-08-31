@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useToast } from '@/providers/ToastProvider';
 import { useAttendance } from '@/providers/AttendanceProvider';
 
@@ -207,7 +208,9 @@ export const AppLayout: React.FC = () => {
 
         {/* Page Content Layout */}
         <main className="flex-1 px-4 py-6 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full pb-24 md:pb-8">
-          <Outlet />
+          <ErrorBoundary fallbackTitle="An error occurred while loading this view">
+            <Outlet />
+          </ErrorBoundary>
         </main>
 
         {/* 3. MOBILE BOTTOM NAVIGATION (hidden on desktop) */}

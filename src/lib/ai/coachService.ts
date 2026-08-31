@@ -2,6 +2,9 @@ import { GoogleGenAI } from '@google/genai';
 import { StructuredCoachContext } from './coachContext';
 import { SYSTEM_INSTRUCTION_TEXT, buildCoachPromptPayload } from './coachPrompts';
 import { parseCoachIntent } from './coachIntents';
+import { validateCoachQuestion } from '@/lib/validation';
+import { normalizeError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 
 export interface CoachResponseContract {
   answer: string;
@@ -11,9 +14,19 @@ export interface CoachResponseContract {
   recommendation: string | null;
 }
 
+export interface CoachApiResponse {
+  success: boolean;
+  data?: CoachResponseContract;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
 /**
  * Executes AI Attendance Coach request on the server.
  * Uses process.env.GEMINI_API_KEY securely without client exposure.
+ * Enforces payload limits, input validation, and sanitized error responses.
  */
 export async function processCoachRequest(
   question: string,
@@ -22,6 +35,7 @@ export async function processCoachRequest(
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey || apiKey.trim() === '') {
+    logger.warn('Coach service requested without server GEMINI_API_KEY configuration');
     return {
       answer: 'AI Coach is temporarily unconfigured (GEMINI_API_KEY is not set on the server).',
       confidence: 'LOW',
@@ -31,9 +45,22 @@ export async function processCoachRequest(
     };
   }
 
+  // 1. Input Validation
+  const valRes = validateCoachQuestion(question);
+  if (!valRes.valid) {
+    logger.warn('Coach request rejected due to invalid input', { error: valRes.error });
+    return {
+      answer: valRes.error || 'Invalid question provided.',
+      confidence: 'LOW',
+      factsUsed: [],
+      warnings: ['Invalid question input.'],
+      recommendation: null,
+    };
+  }
+
   const parsedIntent = parseCoachIntent(question);
 
-  // Handle unsupported questions locally without wasting API tokens
+  // 2. Handle unsupported questions locally without wasting API tokens
   if (parsedIntent.intent === 'UNSUPPORTED') {
     return {
       answer: 'I am SkipLogic’s AI Attendance Coach, specifically designed to help you analyze, understand, and plan your academic attendance. For questions outside academic attendance, please consult your college handbook or advisor.',
@@ -90,10 +117,16 @@ export async function processCoachRequest(
       warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
       recommendation: parsed.recommendation || null,
     };
-  } catch {
+  } catch (error) {
+    const normalized = normalizeError(error, 'AI_ERROR');
+    logger.error('Gemini API execution error in coachService', {
+      category: normalized.category,
+      code: normalized.code,
+    });
+
     // Return sanitized, user-safe error without exposing raw keys or system traces
     return {
-      answer: 'AI Coach is temporarily unavailable. Please check your network connection or try again in a moment.',
+      answer: normalized.userMessage,
       confidence: 'LOW',
       factsUsed: [],
       warnings: ['Unable to reach AI explanation service.'],
